@@ -25,6 +25,16 @@ describe("mock payments", () => {
     expect(await db.mockPayment.count()).toBe(1);
   });
 
+  it("returns the original refund to concurrent calls with the same key", async () => {
+    const payments = createMockPaymentsClient();
+    const results = await Promise.all(
+      Array.from({ length: 5 }, () => payments.refund(input)),
+    );
+    expect(new Set(results.map((r) => r.refundId)).size).toBe(1);
+    expect(results.filter((r) => !r.replayed)).toHaveLength(1);
+    expect(await db.mockPayment.count()).toBe(1);
+  });
+
   it("declines the decline test payment without recording it", async () => {
     await expect(
       createMockPaymentsClient().refund({

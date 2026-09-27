@@ -1,9 +1,13 @@
 const DEFAULT_APPROVAL_PROCESSING_TIMEOUT_MS = 5 * 60 * 1000;
+/** Largest delay setTimeout supports (~24.8 days). */
+const MAX_TIMER_MS = 2 ** 31 - 1;
 
 function positiveInt(value: string | undefined, fallback: number): number {
   if (!value) return fallback;
   const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+  return Number.isInteger(parsed) && parsed > 0
+    ? Math.min(parsed, MAX_TIMER_MS)
+    : fallback;
 }
 
 /** How long an approved request may stay PROCESSING before it counts as failed. */

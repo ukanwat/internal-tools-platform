@@ -7,6 +7,8 @@ import { hasPermission } from "@/platform/permissions/policy";
 
 import { approvalRegistry, type ApprovalRegistry } from "./registry";
 
+export const APPROVALS_PAGE_SIZE = 50;
+
 export const APPROVAL_TABS = ["waiting", "all", "mine"] as const;
 export type ApprovalTab = (typeof APPROVAL_TABS)[number];
 
@@ -47,21 +49,32 @@ export async function listApprovals(
   user: CurrentUser,
   tab: ApprovalTab,
   registry: ApprovalRegistry = approvalRegistry,
+  requestedPage = 1,
 ) {
-  const [requests, ...counts] = await Promise.all([
-    db.approvalRequest.findMany({
-      where: tabWhere(user, tab, registry),
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      take: 200,
-      include: {
-        requestedBy: { select: { id: true, name: true, role: true } },
-        decidedBy: { select: { id: true, name: true, role: true } },
-      },
-    }),
-    ...APPROVAL_TABS.map((t) =>
+  const counts = await Promise.all(
+    APPROVAL_TABS.map((t) =>
       db.approvalRequest.count({ where: tabWhere(user, t, registry) }),
     ),
-  ]);
+  );
+  const countByTab = Object.fromEntries(
+    APPROVAL_TABS.map((t, i) => [t, counts[i]]),
+  ) as Record<ApprovalTab, number>;
+  const pageCount = Math.max(
+    1,
+    Math.ceil(countByTab[tab] / APPROVALS_PAGE_SIZE),
+  );
+  const page = Math.min(Math.max(1, requestedPage), pageCount);
+
+  const requests = await db.approvalRequest.findMany({
+    where: tabWhere(user, tab, registry),
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    skip: (page - 1) * APPROVALS_PAGE_SIZE,
+    take: APPROVALS_PAGE_SIZE,
+    include: {
+      requestedBy: { select: { id: true, name: true, role: true } },
+      decidedBy: { select: { id: true, name: true, role: true } },
+    },
+  });
 
   const types = new Set(decidableTypes(user, registry));
   return {
@@ -73,9 +86,9 @@ export async function listApprovals(
         types.has(request.type) &&
         request.requestedById !== user.id,
     })),
-    counts: Object.fromEntries(
-      APPROVAL_TABS.map((t, i) => [t, counts[i]]),
-    ) as Record<ApprovalTab, number>,
+    counts: countByTab,
+    page,
+    pageCount,
   };
 }
 

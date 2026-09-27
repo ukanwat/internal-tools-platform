@@ -5,7 +5,7 @@ import { seedUser, setupTestDatabase } from "../../../test/db";
 
 import { db } from "@/platform/db";
 
-import { listApprovals, parseApprovalTab } from "./query";
+import { APPROVALS_PAGE_SIZE, listApprovals, parseApprovalTab } from "./query";
 
 setupTestDatabase();
 
@@ -93,6 +93,23 @@ describe("listApprovals", () => {
     const decidable = requests.filter((r) => r.canDecide).map((r) => r.id);
     expect(decidable).toEqual(["a_pending"]);
     expect(counts).toEqual({ waiting: 1, all: 3, mine: 1 });
+  });
+
+  it("pages results and clamps out-of-range pages to the last page", async () => {
+    await db.approvalRequest.createMany({
+      data: Array.from({ length: APPROVALS_PAGE_SIZE }, (_, i) => ({
+        ...base,
+        id: `a_bulk_${i}`,
+        type: "test.refund",
+        requestedById: support.id,
+        createdAt: new Date(Date.UTC(2020, 0, 1, 0, 0, i)),
+      })),
+    });
+    const last = await listApprovals(support, "all", testRegistry, 999);
+    expect(last.page).toBe(2);
+    expect(last.pageCount).toBe(2);
+    expect(last.requests).toHaveLength(2);
+    expect(last.requests.map((r) => r.id)).toEqual(["a_bulk_1", "a_bulk_0"]);
   });
 
   it("parses unknown tabs as waiting", () => {
