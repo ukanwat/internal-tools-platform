@@ -42,3 +42,12 @@ describe("audit filters", () => {
     expect(auditFiltersToQuery({ page: 1 })).toBe("");
   });
 });
+
+describe("audit filters with inherited property names", () => {
+  it.each(["toString", "constructor", "__proto__"])(
+    "drops outcome=%s",
+    (outcome) => {
+      expect(parseAuditFilters({ outcome }).outcome).toBeUndefined();
+    },
+  );
+});

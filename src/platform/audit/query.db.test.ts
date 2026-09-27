@@ -42,6 +42,15 @@ describe("listAuditEntries", () => {
     });
   });
 
+  it("clamps an out-of-range page to the last page", async () => {
+    const { entries, page, pageCount } = await listAuditEntries({
+      page: 10_000_000_000,
+    });
+    expect(page).toBe(1);
+    expect(pageCount).toBe(1);
+    expect(entries).toHaveLength(4);
+  });
+
   it("filters by outcome alone", async () => {
     const { total } = await listAuditEntries({ outcome: "SUCCESS" });
     expect(total).toBe(2);

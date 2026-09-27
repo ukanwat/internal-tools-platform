@@ -1,12 +1,13 @@
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
-import { requireUser } from "@/platform/auth";
+import { getCurrentUser } from "@/platform/auth";
 import { signOut } from "@/platform/auth/actions";
 import { hasPermission, ROLE_LABELS } from "@/platform/permissions";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
-  const user = await requireUser();
+  const user = await getCurrentUser();
+  if (!user) return children;
 
   return (
     <div className="flex flex-1 flex-col">

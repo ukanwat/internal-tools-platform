@@ -17,7 +17,7 @@ export function parseAuditFilters(params: SearchParams): AuditFilters {
     actorId: first(params.actor),
     action: first(params.action),
     outcome:
-      outcome && outcome in AuditOutcome
+      outcome && Object.hasOwn(AuditOutcome, outcome)
         ? (outcome as AuditOutcome)
         : undefined,
     page: Number.isFinite(page) && page > 0 ? page : 1,

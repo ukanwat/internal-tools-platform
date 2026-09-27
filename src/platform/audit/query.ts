@@ -19,24 +19,23 @@ export async function listAuditEntries(filters: AuditFilters) {
     action: filters.action,
     outcome: filters.outcome,
   };
-  const page = Math.max(1, filters.page ?? 1);
+  const total = await db.auditLog.count({ where });
+  const pageCount = Math.max(1, Math.ceil(total / AUDIT_PAGE_SIZE));
+  const page = Math.min(Math.max(1, filters.page ?? 1), pageCount);
 
-  const [entries, total] = await db.$transaction([
-    db.auditLog.findMany({
-      where,
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      skip: (page - 1) * AUDIT_PAGE_SIZE,
-      take: AUDIT_PAGE_SIZE,
-      include: { actor: { select: { id: true, name: true, email: true } } },
-    }),
-    db.auditLog.count({ where }),
-  ]);
+  const entries = await db.auditLog.findMany({
+    where,
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    skip: (page - 1) * AUDIT_PAGE_SIZE,
+    take: AUDIT_PAGE_SIZE,
+    include: { actor: { select: { id: true, name: true, email: true } } },
+  });
 
   return {
     entries,
     total,
     page,
-    pageCount: Math.max(1, Math.ceil(total / AUDIT_PAGE_SIZE)),
+    pageCount,
   };
 }
 
