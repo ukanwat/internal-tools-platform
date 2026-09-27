@@ -32,6 +32,9 @@ const ACTIONS: Record<string, string> = {
   "sensitive.reveal": "Revealed sensitive data",
   "flags.change": "Changed a feature flag",
   "flags.turn_off": "Turned off a feature flag",
+  "refunds.create": "Refund requested",
+  "refunds.paid": "Refund paid",
+  "refunds.payment_failed": "Refund payment failed",
   "attachments.upload": "Uploaded a file",
   "attachments.download": "Downloaded a file",
 };

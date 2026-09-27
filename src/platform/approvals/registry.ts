@@ -1,4 +1,5 @@
 import { flagProductionChangeType } from "@/tools/feature-flags/approval-type";
+import { refundApprovalType } from "@/tools/refunds/approval-type";
 
 import type { ApprovalType } from "./types";
 
@@ -26,4 +27,5 @@ export function createApprovalRegistry(
 /** Tools add their approval types here. */
 export const approvalRegistry = createApprovalRegistry([
   flagProductionChangeType,
+  refundApprovalType,
 ]);

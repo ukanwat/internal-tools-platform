@@ -29,8 +29,9 @@ export const TOOLS: ToolDefinition[] = [
     key: "refunds",
     kind: "tool",
     name: "Refunds",
-    description: "Look up payments and request refunds for customers.",
+    description: "Find a customer's order and refund it.",
     icon: "refunds",
+    href: "/refunds",
     permission: "refunds.view",
   },
   {

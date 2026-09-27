@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 import { CheckboxInput } from "./checkbox-input";
@@ -23,9 +24,18 @@ export type FilterToggle = {
   checked: boolean;
 };
 
+export type FilterSearch = {
+  /** Query-string parameter name. */
+  name: string;
+  label: string;
+  placeholder?: string;
+  value?: string;
+};
+
 type Props = {
   basePath: string;
-  fields: FilterField[];
+  search?: FilterSearch;
+  fields?: FilterField[];
   toggles?: FilterToggle[];
 };
 
@@ -33,13 +43,30 @@ type Props = {
  * Plain GET form so filters live in the URL.
  * Render it with a `key` derived from the current filters so Clear resets it.
  */
-export function FilterBar({ basePath, fields, toggles = [] }: Props) {
+export function FilterBar({
+  basePath,
+  search,
+  fields = [],
+  toggles = [],
+}: Props) {
   return (
     <form
       method="get"
       action={basePath}
       className="bg-card grid gap-4 rounded-xl border p-4 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-end"
     >
+      {search && (
+        <div className="flex min-w-64 flex-1 flex-col gap-2">
+          <Label htmlFor={`filter-${search.name}`}>{search.label}</Label>
+          <Input
+            id={`filter-${search.name}`}
+            name={search.name}
+            type="search"
+            placeholder={search.placeholder}
+            defaultValue={search.value ?? ""}
+          />
+        </div>
+      )}
       {fields.map((field) => (
         <div key={field.name} className="flex min-w-48 flex-col gap-2">
           <Label htmlFor={`filter-${field.name}`}>{field.label}</Label>

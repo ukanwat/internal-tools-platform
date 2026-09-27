@@ -6,6 +6,8 @@ import { PrismaClient } from "../src/generated/prisma/client";
 import type { FlagEnvironment } from "../src/generated/prisma/enums";
 import { SEED_USERS } from "../src/platform/auth/seed-users";
 
+import { seedRefunds } from "./seed-refunds";
+
 const db = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
 });
@@ -76,6 +78,7 @@ async function main() {
     }
   }
   console.log(`Seeded ${SEED_FLAGS.length} feature flags`);
+  await seedRefunds(db);
 }
 
 main()

@@ -19,7 +19,7 @@ export async function resolveRecordNames(
         .map((e) => e.entityId!),
     ),
   ];
-  const [requests, users] = await Promise.all([
+  const [requests, users, orders, refunds] = await Promise.all([
     db.approvalRequest.findMany({
       where: { id: { in: idsFor("ApprovalRequest") } },
       select: { id: true, summary: true },
@@ -28,9 +28,22 @@ export async function resolveRecordNames(
       where: { id: { in: idsFor("User") } },
       select: { id: true, name: true },
     }),
+    db.order.findMany({
+      where: { id: { in: idsFor("Order") } },
+      select: { id: true, number: true },
+    }),
+    db.refund.findMany({
+      where: { id: { in: idsFor("Refund") } },
+      select: { id: true, order: { select: { number: true } } },
+    }),
   ]);
   return Object.fromEntries([
     ...requests.map((r) => [recordKey("ApprovalRequest", r.id), r.summary]),
     ...users.map((u) => [recordKey("User", u.id), u.name]),
+    ...orders.map((o) => [recordKey("Order", o.id), o.number]),
+    ...refunds.map((r) => [
+      recordKey("Refund", r.id),
+      `Refund on ${r.order.number}`,
+    ]),
   ]);
 }
