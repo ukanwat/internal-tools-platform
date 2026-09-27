@@ -1,9 +1,18 @@
+import type { CurrentUser } from "@/platform/auth/types";
+
 import type { SensitiveField } from "./fields";
 
-/** How the platform loads a record's raw sensitive value when someone reveals it. */
+/**
+ * How the platform loads a record's raw sensitive value when someone reveals it.
+ * `load` must return null when `actor` may not access the record.
+ */
 export type SensitiveSource = {
   entityType: string;
-  load: (entityId: string, field: SensitiveField) => Promise<string | null>;
+  load: (
+    entityId: string,
+    field: SensitiveField,
+    actor: CurrentUser,
+  ) => Promise<string | null>;
 };
 
 export type SensitiveSourceRegistry = {

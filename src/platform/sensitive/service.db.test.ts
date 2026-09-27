@@ -12,13 +12,18 @@ setupTestDatabase();
 const support = seedUser("SUPPORT");
 const finance = seedUser("FINANCE_APPROVER");
 const reviewer = seedUser("COMPLIANCE_REVIEWER");
+const lead = seedUser("COMPLIANCE_LEAD");
 
 const ACCOUNT = "GB29NWBK60161331926819";
 const sources = createSensitiveSourceRegistry([
   {
     entityType: "Customer",
-    load: async (id, field) =>
-      id === "cus_1" && field === "accountNumber" ? ACCOUNT : null,
+    load: async (id, field, actor) => {
+      if (field !== "accountNumber") return null;
+      if (id === "cus_1") return ACCOUNT;
+      if (id === "cus_lead_only" && actor.id === lead.id) return ACCOUNT;
+      return null;
+    },
   },
 ]);
 const entity = { type: "Customer", id: "cus_1" };
@@ -130,5 +135,38 @@ describe("revealSensitiveValue", () => {
     expect(
       await db.auditLog.count({ where: { action: "sensitive.reveal" } }),
     ).toBe(0);
+  });
+
+  it("lets the source refuse records the actor may not access", async () => {
+    const restricted = { type: "Customer", id: "cus_lead_only" };
+    expect(
+      await revealSensitiveValue(
+        finance,
+        { field: "accountNumber", entity: restricted, reason: "r" },
+        sources,
+      ),
+    ).toEqual({ ok: false, error: "Value not found" });
+    expect(
+      await revealSensitiveValue(
+        lead,
+        { field: "accountNumber", entity: restricted, reason: "r" },
+        sources,
+      ),
+    ).toEqual({ ok: true, value: ACCOUNT });
+    expect(
+      await db.auditLog.count({ where: { action: "sensitive.reveal" } }),
+    ).toBe(1);
+  });
+
+  it("masks the value if the reason contains it", async () => {
+    await revealSensitiveValue(
+      finance,
+      { field: "accountNumber", entity, reason: `Customer says ${ACCOUNT}` },
+      sources,
+    );
+    const entry = await db.auditLog.findFirstOrThrow({
+      where: { action: "sensitive.reveal" },
+    });
+    expect(entry.reason).toBe("Customer says ••••6819");
   });
 });

@@ -131,7 +131,7 @@ entry records who looked, at which record, and why. A reveal attempt without the
 logged as `DENIED`.
 
 To support reveals, a tool registers a loader for its record type in `sensitiveSources`
-(`src/platform/sensitive/sources.ts`). `recordAudit` masks every property named in
+(`src/platform/sensitive/sources.ts`). The loader receives the current user and returns null for records that user may not open. `recordAudit` masks every property named in
 `SENSITIVE_FIELDS`, at any depth, so the audit log never stores these values in the clear.
 
 ## Tests

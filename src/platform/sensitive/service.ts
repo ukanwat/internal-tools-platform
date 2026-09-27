@@ -50,14 +50,15 @@ export async function revealSensitiveValue(
       error: `You cannot view ${definition.label.toLowerCase()}s`,
     };
 
-  const reason = input.reason.trim();
-  if (!reason) return { ok: false, error: "A reason is required" };
+  const typedReason = input.reason.trim();
+  if (!typedReason) return { ok: false, error: "A reason is required" };
 
   const source = sources.get(input.entity.type);
   if (!source)
     return { ok: false, error: `Nothing to reveal on ${input.entity.type}` };
-  const value = await source.load(input.entity.id, input.field);
+  const value = await source.load(input.entity.id, input.field, actor);
   if (value == null) return { ok: false, error: "Value not found" };
+  const reason = typedReason.replaceAll(value, maskValue(value));
 
   await recordAudit({
     actor,
