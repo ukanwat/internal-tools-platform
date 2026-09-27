@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+
 import {
   approvalRegistry,
   settleApprovals,
@@ -6,7 +8,9 @@ import {
 } from "@/platform/approvals";
 import { ApprovalsList } from "@/platform/approvals/components/approvals-list";
 import { requireUser } from "@/platform/auth";
-import { LinkTabs, PageHeader, Pagination } from "@/platform/ui";
+import { LinkTabs, PageBody, PageHeader, Pagination } from "@/platform/ui";
+
+export const metadata: Metadata = { title: "Approvals" };
 
 const TAB_LABELS = {
   waiting: "Waiting for me",
@@ -31,10 +35,10 @@ export default async function ApprovalsPage({
   );
 
   return (
-    <main className="flex flex-1 flex-col gap-6 p-8">
+    <PageBody>
       <PageHeader
         title="Approvals"
-        description="Requests you made or can decide."
+        description="Requests you made or can decide. Nobody can approve their own request."
       />
       <LinkTabs
         tabs={(["waiting", "all", "mine"] as const).map((t) => ({
@@ -50,6 +54,6 @@ export default async function ApprovalsPage({
         pageCount={pageCount}
         hrefForPage={(p) => `/approvals?tab=${tab}&page=${p}`}
       />
-    </main>
+    </PageBody>
   );
 }

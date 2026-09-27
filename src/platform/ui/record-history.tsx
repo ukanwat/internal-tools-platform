@@ -3,9 +3,10 @@ import "server-only";
 import type { CurrentUser } from "@/platform/auth/types";
 import { db } from "@/platform/db";
 import { hasPermission } from "@/platform/permissions/policy";
+import { describeAction } from "@/platform/audit/labels";
 import { ROLE_LABELS } from "@/platform/permissions/roles";
 
-import { formatTimestamp } from "./format";
+import { LocalTime } from "./local-time";
 import { AuditOutcomeBadge } from "./outcome-badge";
 
 type Props = {
@@ -56,24 +57,20 @@ export async function RecordHistory(props: Props) {
   }
 
   return (
-    <ol className="flex flex-col gap-3 border-l pl-4 text-sm">
+    <ol className="relative flex flex-col gap-4 border-l pl-5 text-sm">
       {entries.map((entry) => (
-        <li key={entry.id} className="flex flex-col gap-1">
+        <li key={entry.id} className="relative flex flex-col gap-1">
+          <span className="bg-primary ring-background absolute top-1.5 -left-[25px] size-2 rounded-full ring-4" />
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-mono text-xs">{entry.action}</span>
+            <span className="font-medium" title={entry.action}>
+              {describeAction(entry.action)}
+            </span>
             <AuditOutcomeBadge outcome={entry.outcome} />
-            <span>
-              {entry.actor?.name ?? "System"}
-              {entry.actorRole && (
-                <span className="text-muted-foreground">
-                  {" "}
-                  ({ROLE_LABELS[entry.actorRole]})
-                </span>
-              )}
-            </span>
-            <span className="text-muted-foreground text-xs">
-              {formatTimestamp(entry.createdAt)}
-            </span>
+          </div>
+          <div className="text-muted-foreground text-xs">
+            {entry.actor?.name ?? "System"}
+            {entry.actorRole && ` (${ROLE_LABELS[entry.actorRole]})`} ·{" "}
+            <LocalTime date={entry.createdAt} />
           </div>
           {entry.reason && (
             <p className="text-muted-foreground whitespace-pre-wrap">

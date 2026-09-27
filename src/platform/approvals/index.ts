@@ -12,4 +12,10 @@ export {
   type ApprovalDeps,
   type ApprovalResult,
 } from "./service";
-export { listApprovals, parseApprovalTab, type ApprovalTab } from "./query";
+export {
+  countApprovals,
+  listApprovals,
+  parseApprovalTab,
+  type ApprovalListItem,
+  type ApprovalTab,
+} from "./query";

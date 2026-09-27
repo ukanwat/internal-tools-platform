@@ -21,6 +21,20 @@ beforeEach(async () => {
 });
 
 describe("listAuditEntries", () => {
+  it("leaves out sign-ins with hideSignIns", async () => {
+    const { entries, total } = await listAuditEntries({ hideSignIns: true });
+    expect(total).toBe(2);
+    expect(entries.every((e) => e.action !== "auth.sign_in")).toBe(true);
+  });
+
+  it("combines hideSignIns with an action filter", async () => {
+    const { total } = await listAuditEntries({
+      hideSignIns: true,
+      action: "audit.view",
+    });
+    expect(total).toBe(2);
+  });
+
   it("returns everything, newest first, without filters", async () => {
     const { entries, total } = await listAuditEntries({});
     expect(total).toBe(4);

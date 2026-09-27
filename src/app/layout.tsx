@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "@/platform/ui/toast";
+
 import "./globals.css";
 
 const geistSans = Geist({
@@ -13,8 +17,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Internal Tools Platform",
-  description: "Internal tools platform",
+  title: { default: "Ops Console", template: "%s · Ops Console" },
+  description: "Internal tools for the payments operations team",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -23,7 +27,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col">{children}</body>
+      <body className="flex min-h-full flex-col">
+        <TooltipProvider>{children}</TooltipProvider>
+        <Toaster richColors position="top-right" />
+      </body>
     </html>
   );
 }
