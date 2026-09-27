@@ -18,6 +18,14 @@ enum Role {
 enum AuditOutcome {
   SUCCESS
   DENIED
+  FAILURE
+}
+
+enum ApprovalStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  REJECTED
 }
 
 model User {
@@ -27,6 +35,8 @@ model User {
   role         Role
   createdAt    DateTime   @default(now()) @map("created_at")
   auditEntries AuditLog[]
+  requested    ApprovalRequest[] @relation("requestedBy")
+  decided      ApprovalRequest[] @relation("decidedBy")
 
   @@map("users")
 }
@@ -53,4 +63,46 @@ model AuditLog {
   @@index([outcome, createdAt])
   @@index([entityType, entityId])
   @@map("audit_log")
+}
+
+model ApprovalRequest {
+  id                  String         @id @default(cuid())
+  /// Registered approval type key, e.g. `refunds.issue`.
+  type                String
+  status              ApprovalStatus @default(PENDING)
+  payload             Json
+  summary             String
+  entityType          String?        @map("entity_type")
+  entityId            String?        @map("entity_id")
+  requestedById       String         @map("requested_by_id")
+  requestedBy         User           @relation("requestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+  requestReason       String         @map("request_reason")
+  decidedById         String?        @map("decided_by_id")
+  decidedBy           User?          @relation("decidedBy", fields: [decidedById], references: [id], onDelete: Restrict)
+  decisionReason      String?        @map("decision_reason")
+  decidedAt           DateTime?      @map("decided_at")
+  processingStartedAt DateTime?      @map("processing_started_at")
+  completedAt         DateTime?      @map("completed_at")
+  lastError           String?        @map("last_error")
+  attempts            Int            @default(0)
+  createdAt           DateTime       @default(now()) @map("created_at")
+  updatedAt           DateTime       @updatedAt @map("updated_at")
+
+  @@index([status, type])
+  @@index([requestedById, createdAt])
+  @@index([status, processingStartedAt])
+  @@map("approval_requests")
+}
+
+/// Backing store for the mock payments integration.
+model MockPayment {
+  id             String   @id @default(cuid())
+  idempotencyKey String   @unique @map("idempotency_key")
+  kind           String
+  paymentId      String   @map("payment_id")
+  amountMinor    Int      @map("amount_minor")
+  currency       String
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@map("mock_payments")
 }

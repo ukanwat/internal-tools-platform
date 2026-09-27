@@ -42,6 +42,10 @@ The app runs at http://localhost:3000. Sign in with the "sign in as" picker; `db
   - `auth` — fake "sign in as" login and signed session cookie (swap for SSO here)
   - `permissions` — `ROLE_PERMISSIONS` map and `requirePermission()`
   - `audit` — `recordAudit()` and the audit log queries/components
+  - `approvals` — second-person sign-off: request, approve/reject with a reason, `/approvals` page
+  - `integrations` — the only way to reach outside systems (`payments` is a mock for now)
+  - `ui` — shared page header, data table, filter bar, status badges, record history
+  - `config.ts` — platform settings read from the environment
   - `db` — shared Prisma Client instance
 - `prisma/schema.prisma` — database schema; `prisma.config.ts` — Prisma CLI config
 - `src/generated/prisma` — generated Prisma Client (git-ignored, created on `npm install`)
@@ -87,6 +91,33 @@ export async function approveRefund(refundId: string, reason: string) {
 
 The audit log is append-only (a database trigger rejects `UPDATE` and `DELETE`). Admins and
 compliance leads can view it at `/admin/audit`.
+
+## Approvals
+
+A tool that needs a second person to sign off defines an approval type and adds it to the
+registry in `src/platform/approvals/registry.ts`:
+
+```ts
+export const refundApproval = defineApprovalType<RefundPayload>({
+  key: "refunds.issue",
+  label: "Refund",
+  requestPermission: "refunds.request",
+  decidePermission: "refunds.approve",
+  parse: parseRefundPayload, // throw on invalid input
+  describe: (p) => `Refund ${p.amountMinor} ${p.currency} on ${p.paymentId}`,
+  entity: (p) => ({ type: "Payment", id: p.paymentId }),
+  execute: ({ payload, idempotencyKey, integrations }) =>
+    integrations.payments.refund({ idempotencyKey, ...payload }).then(() => {}),
+});
+```
+
+The tool then calls `createApprovalRequest(user, { type, payload, reason })`. On approval the
+request is marked `PROCESSING`, then `execute` runs. If `execute` throws, or runs longer than
+`APPROVAL_PROCESSING_TIMEOUT_MS` (default 5 minutes), the request goes back to `PENDING` with the
+error, and the failure is logged. Requests left in `PROCESSING` past the timeout get the same
+treatment the next time anyone loads `/approvals` or decides a request. Nobody can decide their own
+request. Every block writes a `DENIED` audit entry first, the same way `requirePermission` does.
+`execute` receives the request id as `idempotencyKey`, so a retry never pays twice.
 
 ## Tests
 
