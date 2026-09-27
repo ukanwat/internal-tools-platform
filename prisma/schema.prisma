@@ -6,3 +6,51 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+enum Role {
+  SUPPORT
+  FINANCE_APPROVER
+  COMPLIANCE_REVIEWER
+  COMPLIANCE_LEAD
+  ADMIN
+}
+
+enum AuditOutcome {
+  SUCCESS
+  DENIED
+}
+
+model User {
+  id           String     @id
+  email        String     @unique
+  name         String
+  role         Role
+  createdAt    DateTime   @default(now()) @map("created_at")
+  auditEntries AuditLog[]
+
+  @@map("users")
+}
+
+/// Append-only: a database trigger rejects UPDATE and DELETE.
+model AuditLog {
+  id         String       @id @default(cuid())
+  createdAt  DateTime     @default(now()) @map("created_at")
+  actorId    String?      @map("actor_id")
+  actor      User?        @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  /// Role at the time of the event; the user's role may change later.
+  actorRole  Role?        @map("actor_role")
+  action     String
+  outcome    AuditOutcome
+  entityType String?      @map("entity_type")
+  entityId   String?      @map("entity_id")
+  before     Json?
+  after      Json?
+  reason     String?
+
+  @@index([createdAt])
+  @@index([actorId, createdAt])
+  @@index([action, createdAt])
+  @@index([outcome, createdAt])
+  @@index([entityType, entityId])
+  @@map("audit_log")
+}
