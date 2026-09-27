@@ -3,11 +3,18 @@ import { AuditOutcome } from "@/generated/prisma/enums";
 import { ROLE_LABELS } from "@/platform/permissions/roles";
 import { AUDIT_OUTCOME_LABELS, FilterBar } from "@/platform/ui";
 
+import { describeAction } from "../labels";
+
 type Props = {
   basePath: string;
   actors: { id: string; name: string; role: Role }[];
   actions: string[];
-  selected: { actorId?: string; action?: string; outcome?: string };
+  selected: {
+    actorId?: string;
+    action?: string;
+    outcome?: string;
+    includeSignIns?: boolean;
+  };
 };
 
 export function AuditFilters({ basePath, actors, actions, selected }: Props) {
@@ -30,7 +37,9 @@ export function AuditFilters({ basePath, actors, actions, selected }: Props) {
           label: "Action",
           anyLabel: "Any action",
           value: selected.action,
-          options: actions.map((action) => ({ value: action, label: action })),
+          options: actions
+            .map((action) => ({ value: action, label: describeAction(action) }))
+            .sort((a, b) => a.label.localeCompare(b.label)),
         },
         {
           name: "outcome",
@@ -41,6 +50,13 @@ export function AuditFilters({ basePath, actors, actions, selected }: Props) {
             value: outcome,
             label: AUDIT_OUTCOME_LABELS[outcome],
           })),
+        },
+      ]}
+      toggles={[
+        {
+          name: "signins",
+          label: "Show sign-ins",
+          checked: Boolean(selected.includeSignIns),
         },
       ]}
     />

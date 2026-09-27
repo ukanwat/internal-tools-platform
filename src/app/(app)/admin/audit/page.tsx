@@ -1,14 +1,21 @@
+import type { Metadata } from "next";
+
 import { getAuditFilterOptions, listAuditEntries } from "@/platform/audit";
 import { AuditFilters } from "@/platform/audit/components/audit-filters";
 import { AuditLogTable } from "@/platform/audit/components/audit-log-table";
 import {
   auditFiltersToQuery,
   parseAuditFilters,
+  shouldHideSignIns,
 } from "@/platform/audit/filters";
+import { resolveRecordNames } from "@/platform/audit/record-names";
 import { requirePermission } from "@/platform/permissions";
 import { PageHeader, Pagination } from "@/platform/ui";
+import { PageBody } from "@/platform/ui/page";
 
 const BASE_PATH = "/admin/audit";
+
+export const metadata: Metadata = { title: "Audit log" };
 
 export default async function AuditLogPage({
   searchParams,
@@ -17,15 +24,16 @@ export default async function AuditLogPage({
 
   const filters = parseAuditFilters(await searchParams);
   const [{ entries, total, page, pageCount }, options] = await Promise.all([
-    listAuditEntries(filters),
+    listAuditEntries({ ...filters, hideSignIns: shouldHideSignIns(filters) }),
     getAuditFilterOptions(),
   ]);
+  const recordNames = await resolveRecordNames(entries);
 
   return (
-    <main className="flex flex-1 flex-col gap-6 p-8">
+    <PageBody>
       <PageHeader
         title="Audit log"
-        description={`${total} ${total === 1 ? "entry" : "entries"}`}
+        description={`Every action and blocked attempt across the platform. ${total} ${total === 1 ? "entry" : "entries"}${shouldHideSignIns(filters) ? ", sign-ins hidden" : ""}.`}
       />
       <AuditFilters
         key={auditFiltersToQuery({ ...filters, page: 1 })}
@@ -34,7 +42,9 @@ export default async function AuditLogPage({
         actions={options.actions}
         selected={filters}
       />
-      <AuditLogTable entries={entries} />
+      <div className="bg-card rounded-xl border">
+        <AuditLogTable entries={entries} recordNames={recordNames} />
+      </div>
       <Pagination
         page={page}
         pageCount={pageCount}
@@ -42,6 +52,6 @@ export default async function AuditLogPage({
           `${BASE_PATH}${auditFiltersToQuery({ ...filters, page: p })}`
         }
       />
-    </main>
+    </PageBody>
   );
 }

@@ -9,7 +9,7 @@ function first(value: string | string[] | undefined): string | undefined {
   return v ? v : undefined;
 }
 
-/** Parses `?actor=&action=&outcome=&page=`, dropping invalid values. */
+/** Parses `?actor=&action=&outcome=&signins=1&page=`, dropping invalid values. */
 export function parseAuditFilters(params: SearchParams): AuditFilters {
   const outcome = first(params.outcome);
   const page = Number.parseInt(first(params.page) ?? "", 10);
@@ -21,7 +21,13 @@ export function parseAuditFilters(params: SearchParams): AuditFilters {
         ? (outcome as AuditOutcome)
         : undefined,
     page: Number.isFinite(page) && page > 0 ? page : 1,
+    ...(first(params.signins) === "1" && { includeSignIns: true }),
   };
+}
+
+/** Sign-ins are noise unless asked for, or unless the action filter picks one. */
+export function shouldHideSignIns(filters: AuditFilters): boolean {
+  return !filters.includeSignIns && !filters.action;
 }
 
 export function auditFiltersToQuery(filters: AuditFilters): string {
@@ -29,6 +35,7 @@ export function auditFiltersToQuery(filters: AuditFilters): string {
   if (filters.actorId) query.set("actor", filters.actorId);
   if (filters.action) query.set("action", filters.action);
   if (filters.outcome) query.set("outcome", filters.outcome);
+  if (filters.includeSignIns) query.set("signins", "1");
   if (filters.page && filters.page > 1) query.set("page", String(filters.page));
   const s = query.toString();
   return s ? `?${s}` : "";

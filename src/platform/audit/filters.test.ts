@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { auditFiltersToQuery, parseAuditFilters } from "./filters";
+import {
+  auditFiltersToQuery,
+  parseAuditFilters,
+  shouldHideSignIns,
+} from "./filters";
 
 describe("audit filters", () => {
   it("parses valid params", () => {
@@ -50,4 +54,24 @@ describe("audit filters with inherited property names", () => {
       expect(parseAuditFilters({ outcome }).outcome).toBeUndefined();
     },
   );
+});
+
+describe("sign-in visibility", () => {
+  it("hides sign-ins by default", () => {
+    const filters = parseAuditFilters({});
+    expect(filters.includeSignIns).toBeUndefined();
+    expect(shouldHideSignIns(filters)).toBe(true);
+  });
+
+  it("shows them with signins=1 and keeps that in the query", () => {
+    const filters = parseAuditFilters({ signins: "1" });
+    expect(shouldHideSignIns(filters)).toBe(false);
+    expect(auditFiltersToQuery(filters)).toBe("?signins=1");
+  });
+
+  it("shows them when an action is picked", () => {
+    expect(
+      shouldHideSignIns(parseAuditFilters({ action: "auth.sign_in" })),
+    ).toBe(false);
+  });
 });

@@ -3,6 +3,9 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 
+import { CheckboxInput } from "./checkbox-input";
+import { SelectInput } from "./form-fields";
+
 export type FilterField = {
   /** Query-string parameter name. */
   name: string;
@@ -13,52 +16,61 @@ export type FilterField = {
   value?: string;
 };
 
+export type FilterToggle = {
+  /** Query-string parameter name; sent as `name=1` when checked. */
+  name: string;
+  label: string;
+  checked: boolean;
+};
+
 type Props = {
   basePath: string;
   fields: FilterField[];
+  toggles?: FilterToggle[];
 };
 
-const selectClassName =
-  "h-8 rounded-lg border border-input bg-background px-2 text-sm";
-
 /**
- * Plain GET form so filters live in the URL and work without JS.
+ * Plain GET form so filters live in the URL.
  * Render it with a `key` derived from the current filters so Clear resets it.
  */
-export function FilterBar({ basePath, fields }: Props) {
+export function FilterBar({ basePath, fields, toggles = [] }: Props) {
   return (
     <form
       method="get"
       action={basePath}
-      className="flex flex-wrap items-end gap-4"
+      className="bg-card grid gap-4 rounded-xl border p-4 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-end"
     >
       {fields.map((field) => (
-        <div key={field.name} className="flex flex-col gap-1">
+        <div key={field.name} className="flex min-w-48 flex-col gap-2">
           <Label htmlFor={`filter-${field.name}`}>{field.label}</Label>
-          <select
+          <SelectInput
             id={`filter-${field.name}`}
             name={field.name}
             defaultValue={field.value ?? ""}
-            className={selectClassName}
-          >
-            <option value="">{field.anyLabel}</option>
-            {field.options.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+            options={[{ value: "", label: field.anyLabel }, ...field.options]}
+          />
         </div>
       ))}
-      <Button type="submit" size="sm">
-        Apply
-      </Button>
-      <Link
-        href={basePath}
-        className="text-muted-foreground text-sm underline-offset-4 hover:underline"
-      >
-        Clear
-      </Link>
+      {toggles.map((toggle) => (
+        <CheckboxInput
+          key={toggle.name}
+          id={`filter-${toggle.name}`}
+          name={toggle.name}
+          label={toggle.label}
+          defaultChecked={toggle.checked}
+          className="lg:h-8"
+        />
+      ))}
+      <div className="flex items-center gap-2 sm:col-span-2 lg:ml-auto">
+        <Button type="submit">Apply filters</Button>
+        <Button
+          variant="ghost"
+          nativeButton={false}
+          render={<Link href={basePath} />}
+        >
+          Clear
+        </Button>
+      </div>
     </form>
   );
 }

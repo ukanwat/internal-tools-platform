@@ -18,14 +18,17 @@ const base: AuditLogRow = {
 };
 
 describe("AuditLogTable", () => {
-  it("renders who, what, record, outcome and why", () => {
+  it("renders who, what, record, outcome and why in plain English", () => {
     render(<AuditLogTable entries={[base]} />);
     expect(screen.getByText("Sam Support")).toBeInTheDocument();
     expect(screen.getByText("Support")).toBeInTheDocument();
-    expect(screen.getByText("refunds.approve")).toBeInTheDocument();
-    expect(screen.getByText("Refund:rf_1")).toBeInTheDocument();
+    expect(screen.getByText("Approve a refund")).toBeInTheDocument();
+    expect(screen.getByText("rf_1")).toBeInTheDocument();
+    expect(screen.getByText("Refund")).toBeInTheDocument();
     expect(screen.getByText("Denied")).toBeInTheDocument();
-    expect(screen.getByText(base.reason!)).toBeInTheDocument();
+    expect(
+      screen.getByText("Support users aren't allowed to approve a refund."),
+    ).toBeInTheDocument();
   });
 
   it("shows anonymous actors and before/after values", () => {
@@ -46,6 +49,26 @@ describe("AuditLogTable", () => {
     expect(screen.getByText("Anonymous")).toBeInTheDocument();
     expect(screen.getByText(/"PENDING"/)).toBeInTheDocument();
     expect(screen.getByText(/"APPROVED"/)).toBeInTheDocument();
+  });
+
+  it("shows record names instead of IDs when known", () => {
+    render(
+      <AuditLogTable
+        entries={[
+          {
+            ...base,
+            action: "approvals.approve",
+            entityType: "ApprovalRequest",
+            entityId: "req_1",
+          },
+        ]}
+        recordNames={{ "ApprovalRequest:req_1": "Refund £20 to Jane" }}
+      />,
+    );
+    expect(screen.getByText("Approved a request")).toBeInTheDocument();
+    expect(screen.getByText("Refund £20 to Jane")).toBeInTheDocument();
+    expect(screen.getByText("Approval request")).toBeInTheDocument();
+    expect(screen.queryByText("req_1")).not.toBeInTheDocument();
   });
 
   it("shows an empty state", () => {
