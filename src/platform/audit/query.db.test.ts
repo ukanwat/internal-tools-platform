@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { SEED_USERS } from "@/platform/auth/seed-users";
+
 import { seedUser, setupTestDatabase } from "../../../test/db";
 
 import { getAuditFilterOptions, listAuditEntries } from "./query";
@@ -74,7 +76,7 @@ describe("listAuditEntries", () => {
 describe("getAuditFilterOptions", () => {
   it("lists people and distinct actions", async () => {
     const { actors, actions } = await getAuditFilterOptions();
-    expect(actors).toHaveLength(5);
+    expect(actors).toHaveLength(SEED_USERS.length);
     expect(actions).toEqual(["audit.view", "auth.sign_in"]);
   });
 });

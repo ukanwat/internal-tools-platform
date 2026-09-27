@@ -34,6 +34,8 @@ type Props = {
   confirmVariant?: "default" | "destructive";
   reasonLabel?: string;
   reasonPlaceholder?: string;
+  /** Extra form fields shown above the reason. */
+  children?: ReactNode;
 };
 
 /**
@@ -51,6 +53,7 @@ export function ReasonDialog({
   confirmVariant = "default",
   reasonLabel = "Reason",
   reasonPlaceholder = "Explain your decision. This is saved to the audit log.",
+  children,
 }: Props) {
   const id = useId();
   const [open, setOpen] = useState(false);
@@ -87,6 +90,7 @@ export function ReasonDialog({
             <input key={name} type="hidden" name={name} value={value} />
           ))}
           <FieldGroup>
+            {children}
             <TextareaField
               id={`${id}-reason`}
               name="reason"

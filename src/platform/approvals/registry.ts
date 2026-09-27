@@ -1,3 +1,4 @@
+import { flagProductionChangeType } from "@/tools/feature-flags/approval-type";
 import { kycDecisionApprovalType } from "@/tools/kyc/approval-type";
 
 import { refundApprovalType } from "@/tools/refunds/approval-type";
@@ -27,6 +28,7 @@ export function createApprovalRegistry(
 
 /** Tools add their approval types here. */
 export const approvalRegistry = createApprovalRegistry([
+  flagProductionChangeType,
   kycDecisionApprovalType,
   refundApprovalType,
 ]);

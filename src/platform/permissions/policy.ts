@@ -10,6 +10,11 @@ export const PERMISSIONS = [
   "audit.view",
   "pii.reveal_account_number",
   "pii.reveal_id_number",
+  "flags.view",
+  "flags.change_staging",
+  "flags.reduce_production",
+  "flags.request_production",
+  "flags.approve_production",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -30,6 +35,19 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "audit.view",
     "pii.reveal_account_number",
     "pii.reveal_id_number",
+  ],
+  ENGINEER: [
+    "flags.view",
+    "flags.change_staging",
+    "flags.reduce_production",
+    "flags.request_production",
+  ],
+  ENG_MANAGER: [
+    "flags.view",
+    "flags.change_staging",
+    "flags.reduce_production",
+    "flags.request_production",
+    "flags.approve_production",
   ],
   ADMIN: ["audit.view"],
 };
