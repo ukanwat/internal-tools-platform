@@ -43,9 +43,9 @@ export const testRefundType = defineApprovalType<TestRefundPayload>({
     await integrations.payments.refund({ idempotencyKey, ...payload });
   },
   async checkOutcome({ idempotencyKey, integrations }) {
-    return (await integrations.payments.findRefund(idempotencyKey))
-      ? "completed"
-      : "failed";
+    const refund = await integrations.payments.findRefund(idempotencyKey);
+    if (!refund || refund.status === "failed") return "failed";
+    return refund.status === "succeeded" ? "completed" : null;
   },
 });
 

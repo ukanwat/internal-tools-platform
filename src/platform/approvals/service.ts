@@ -180,7 +180,10 @@ async function checkDecision(
     );
     return {
       ok: false as const,
-      error: `Request is already ${request.status.toLowerCase()}`,
+      error:
+        request.status === "OUTCOME_UNKNOWN"
+          ? "This request's outcome is still being confirmed"
+          : `Request is already ${request.status.toLowerCase()}`,
     };
   }
 

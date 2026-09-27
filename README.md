@@ -109,10 +109,11 @@ export const refundApproval = defineApprovalType<RefundPayload>({
   entity: (p) => ({ type: "Payment", id: p.paymentId }),
   execute: ({ payload, idempotencyKey, integrations }) =>
     integrations.payments.refund({ idempotencyKey, ...payload }).then(() => {}),
-  checkOutcome: async ({ idempotencyKey, integrations }) =>
-    (await integrations.payments.findRefund(idempotencyKey))
-      ? "completed"
-      : "failed",
+  checkOutcome: async ({ idempotencyKey, integrations }) => {
+    const refund = await integrations.payments.findRefund(idempotencyKey);
+    if (!refund || refund.status === "failed") return "failed";
+    return refund.status === "succeeded" ? "completed" : null; // null: still in flight
+  },
 });
 ```
 
@@ -124,7 +125,8 @@ request is marked `PROCESSING`, then `execute` runs:
   marked `OUTCOME_UNKNOWN`. Nobody can approve or reject it in that state. Once the late execution
   finishes, or on the next `settleApprovals` sweep (which runs whenever `/approvals` loads or a
   request is decided), `checkOutcome` decides where it goes: `COMPLETED` if it went through,
-  `PENDING` if it didn't. Requests left in `PROCESSING` past the timeout are treated the same way.
+  `PENDING` if it definitely didn't. While the outcome can still change, `checkOutcome` returns
+  `null` and the request stays `OUTCOME_UNKNOWN`. Requests left in `PROCESSING` past the timeout are treated the same way.
 
 Users only see a generic error message. The raw error goes in the audit log, and record history
 hides it, and denied attempts, from anyone without `audit.view`. Nobody can decide their own

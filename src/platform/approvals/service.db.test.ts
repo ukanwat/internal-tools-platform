@@ -481,6 +481,29 @@ describe("settleApprovals", () => {
     });
   });
 
+  it("keeps a request outcome unknown while its refund is still in flight", async () => {
+    const request = await newRequest(MOCK_PAYMENT_IDS.hang);
+    await approveApprovalRequest(finance, request.id, "ok", {
+      ...deps,
+      processingTimeoutMs: 50,
+    });
+
+    expect(await settleApprovals(deps)).toEqual({ timedOut: 0, settled: 0 });
+    expect(
+      (
+        await db.approvalRequest.findUniqueOrThrow({
+          where: { id: request.id },
+        })
+      ).status,
+    ).toBe("OUTCOME_UNKNOWN");
+    expect(
+      await rejectApprovalRequest(finance, request.id, "no", deps),
+    ).toMatchObject({
+      ok: false,
+      error: "This request's outcome is still being confirmed",
+    });
+  });
+
   it("completes unknown requests whose refund went through and reopens the rest", async () => {
     const paid = await newRequest("pay_paid");
     const unpaid = await newRequest("pay_unpaid");
