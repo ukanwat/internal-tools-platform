@@ -34,6 +34,19 @@ describe("recordAudit", () => {
     });
   });
 
+  it("always masks sensitive fields in before and after", async () => {
+    await recordAudit({
+      actor: seedUser("FINANCE_APPROVER"),
+      action: "customers.update",
+      entity: { type: "Customer", id: "cus_1" },
+      before: { accountNumber: "GB29NWBK60161331926819", name: "Jo" },
+      after: { accountNumber: "GB94BARC10201530093459", name: "Jo" },
+    });
+    const entry = await db.auditLog.findFirstOrThrow();
+    expect(entry.before).toEqual({ accountNumber: "••••6819", name: "Jo" });
+    expect(entry.after).toEqual({ accountNumber: "••••3459", name: "Jo" });
+  });
+
   it("commits with the change when written in the same transaction", async () => {
     const actor = seedUser("ADMIN");
     await db.$transaction(async (tx) => {

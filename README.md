@@ -44,6 +44,7 @@ The app runs at http://localhost:3000. Sign in with the "sign in as" picker; `db
   - `audit` — `recordAudit()` and the audit log queries/components
   - `approvals` — second-person sign-off: request, approve/reject with a reason, `/approvals` page
   - `integrations` — the only way to reach outside systems (`payments` is a mock for now)
+  - `sensitive` — masked fields (account/ID numbers) and audited, reason-required reveals
   - `ui` — shared page header, data table, filter bar, status badges, record history
   - `config.ts` — platform settings read from the environment
   - `db` — shared Prisma Client instance
@@ -118,6 +119,20 @@ error, and the failure is logged. Requests left in `PROCESSING` past the timeout
 treatment the next time anyone loads `/approvals` or decides a request. Nobody can decide their own
 request. Every block writes a `DENIED` audit entry first, the same way `requirePermission` does.
 `execute` receives the request id as `idempotencyKey`, so a retry never pays twice.
+
+## Sensitive fields
+
+`SENSITIVE_FIELDS` in `src/platform/sensitive/fields.ts` lists each sensitive field (for example
+`accountNumber` or `idNumber`) and the permission needed to reveal it. The raw value stays on the
+server. Pages pass `toSensitiveView(user, field, entity, value)` to `<SensitiveValue>`, and the
+browser only ever receives the masked value (`••••6819`). Users with the reveal permission can
+click Reveal and must give a reason. The value is returned only after a `sensitive.reveal` audit
+entry records who looked, at which record, and why. A reveal attempt without the permission is
+logged as `DENIED`.
+
+To support reveals, a tool registers a loader for its record type in `sensitiveSources`
+(`src/platform/sensitive/sources.ts`). The loader receives the current user and returns null for records that user may not open. `recordAudit` masks every property named in
+`SENSITIVE_FIELDS`, at any depth, so the audit log never stores these values in the clear.
 
 ## Tests
 

@@ -8,6 +8,8 @@ export const PERMISSIONS = [
   "kyc.review",
   "kyc.decide",
   "audit.view",
+  "pii.reveal_account_number",
+  "pii.reveal_id_number",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -15,9 +17,20 @@ export type Permission = (typeof PERMISSIONS)[number];
 /** The single source of truth for what each role may do. */
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   SUPPORT: ["refunds.view", "refunds.request", "kyc.view"],
-  FINANCE_APPROVER: ["refunds.view", "refunds.approve"],
-  COMPLIANCE_REVIEWER: ["kyc.view", "kyc.review"],
-  COMPLIANCE_LEAD: ["kyc.view", "kyc.review", "kyc.decide", "audit.view"],
+  FINANCE_APPROVER: [
+    "refunds.view",
+    "refunds.approve",
+    "pii.reveal_account_number",
+  ],
+  COMPLIANCE_REVIEWER: ["kyc.view", "kyc.review", "pii.reveal_id_number"],
+  COMPLIANCE_LEAD: [
+    "kyc.view",
+    "kyc.review",
+    "kyc.decide",
+    "audit.view",
+    "pii.reveal_account_number",
+    "pii.reveal_id_number",
+  ],
   ADMIN: ["audit.view"],
 };
 
