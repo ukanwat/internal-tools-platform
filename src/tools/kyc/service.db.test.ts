@@ -406,6 +406,32 @@ describe("supporting documents", () => {
     expect(result.ok).toBe(false);
   });
 
+  it("cannot be attached if the case is decided mid-upload", async () => {
+    const racing = {
+      ...storage,
+      async put(key: string, bytes: Uint8Array) {
+        await storage.put(key, bytes);
+        await decideKycCase(lead, {
+          caseId: LOW,
+          decision: "reject",
+          reason: "Mismatch",
+        });
+      },
+    };
+    const result = await uploadAttachment(
+      reviewer,
+      { entity: kycEntity(LOW), file },
+      { storage: racing },
+    );
+    expect(result.ok).toBe(false);
+    expect(await db.attachment.count()).toBe(0);
+    expect(
+      await db.auditLog.findFirstOrThrow({
+        where: { action: "attachments.upload" },
+      }),
+    ).toMatchObject({ outcome: "DENIED", entityId: LOW });
+  });
+
   it("cannot be attached by support", async () => {
     const result = await uploadAttachment(
       support,
