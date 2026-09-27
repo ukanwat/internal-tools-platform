@@ -21,7 +21,7 @@ import { requireUser } from "@/platform/auth";
 import { hasPermission, ROLE_LABELS } from "@/platform/permissions";
 import { TOOLS } from "@/platform/tools";
 import { PageBody, PageHeader } from "@/platform/ui";
-import { TOOL_ICONS } from "@/platform/ui/app-shell";
+import { TOOL_ICONS } from "@/platform/ui/tool-icons";
 import { LocalTime } from "@/platform/ui/local-time";
 
 const PREVIEW = 5;

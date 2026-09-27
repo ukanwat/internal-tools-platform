@@ -1,15 +1,6 @@
 "use client";
 
-import {
-  BadgeCheckIcon,
-  ChevronsUpDownIcon,
-  HomeIcon,
-  LogOutIcon,
-  ReceiptTextIcon,
-  ScrollTextIcon,
-  ShieldCheckIcon,
-  type LucideIcon,
-} from "lucide-react";
+import { ChevronsUpDownIcon, LogOutIcon, ShieldCheckIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
@@ -44,13 +35,7 @@ import {
 } from "@/components/ui/sidebar";
 import type { ToolIcon } from "@/platform/tools";
 
-export const TOOL_ICONS: Record<ToolIcon | "home", LucideIcon> = {
-  home: HomeIcon,
-  approvals: BadgeCheckIcon,
-  audit: ScrollTextIcon,
-  refunds: ReceiptTextIcon,
-  kyc: ShieldCheckIcon,
-};
+import { TOOL_ICONS } from "./tool-icons";
 
 export type NavItem = {
   href: string;
