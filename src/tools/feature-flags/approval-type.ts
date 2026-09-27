@@ -116,7 +116,7 @@ export const flagProductionChangeType =
         });
         const approval = await tx.approvalRequest.findUniqueOrThrow({
           where: { id: request.id },
-          select: { requestReason: true },
+          select: { requestReason: true, decisionReason: true },
         });
         await recordAudit(
           {
@@ -127,8 +127,10 @@ export const flagProductionChangeType =
             after: {
               ...flagSnapshot(after, before.flag.key),
               approvalRequestId: request.id,
+              requestedById: request.requestedById,
+              requestReason: approval.requestReason,
             },
-            reason: approval.requestReason,
+            reason: approval.decisionReason ?? approval.requestReason,
           },
           tx,
         );

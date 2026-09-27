@@ -234,21 +234,26 @@ export async function turnOffFlag(
   const reason = input.reason.trim();
   if (!reason) return { ok: false, error: "A reason is required" };
 
-  const turnedOff = await db.$transaction(async (tx) => {
+  const outcome = await db.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM feature_flag_states WHERE id = ${state.id} FOR UPDATE`;
     const before = await tx.featureFlagState.findUniqueOrThrow({
       where: { id: state.id },
     });
-    const { count } = await tx.featureFlagState.updateMany({
-      where: { id: state.id, enabled: true },
+    const pending = await tx.approvalRequest.count({
+      where: {
+        type: FLAG_PRODUCTION_CHANGE,
+        entityId: state.id,
+        status: { in: [...OPEN_STATUSES] },
+      },
+    });
+    if (!before.enabled && pending === 0) return "already_off" as const;
+    const after = await tx.featureFlagState.update({
+      where: { id: state.id },
       data: {
         enabled: false,
         version: { increment: 1 },
         updatedById: actor.id,
       },
-    });
-    if (count === 0) return false;
-    const after = await tx.featureFlagState.findUniqueOrThrow({
-      where: { id: state.id },
     });
     await recordAudit(
       {
@@ -261,7 +266,12 @@ export async function turnOffFlag(
       },
       tx,
     );
-    return true;
+    return before.enabled ? ("turned_off" as const) : ("cancelled" as const);
   });
-  return { ok: true, message: turnedOff ? "Flag turned off" : "Already off" };
+  const messages = {
+    turned_off: "Flag turned off",
+    cancelled: "Already off. Pending requests can no longer be applied",
+    already_off: "Already off",
+  };
+  return { ok: true, message: messages[outcome] };
 }

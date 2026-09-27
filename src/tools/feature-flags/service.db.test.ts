@@ -191,8 +191,10 @@ describe("production changes that raise exposure", () => {
           enabled: true,
           rolloutPercent: 25,
           approvalRequestId: request.id,
+          requestedById: engineer.id,
+          requestReason: "Launch to a quarter of users",
         },
-        reason: "Launch to a quarter of users",
+        reason: "LGTM",
       },
     ]);
   });
@@ -345,6 +347,24 @@ describe("turning off in production (kill switch)", () => {
       reason: "Fixed, turning back on",
     });
     expect(again.ok).toBe(true);
+  });
+
+  it("invalidates a pending turn-on even when the flag is already off", async () => {
+    const { state, request } = await requestProductionChange();
+
+    expect(
+      await turnOffFlag(engineer, { stateId: state.id, reason: "Incident" }),
+    ).toEqual({
+      ok: true,
+      message: "Already off. Pending requests can no longer be applied",
+    });
+
+    const approval = await approveApprovalRequest(manager, request.id, "ok");
+    expect(approval.ok).toBe(false);
+    expect(await stateOf(state.id)).toMatchObject({
+      enabled: false,
+      version: 1,
+    });
   });
 
   it("is a no-op when the flag is already off", async () => {

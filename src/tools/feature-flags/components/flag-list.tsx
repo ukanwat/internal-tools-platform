@@ -119,7 +119,7 @@ function StateRow({
               }}
             />
           )}
-          {canTurnOff && state.enabled && (
+          {canTurnOff && (state.enabled || state.openRequests.length > 0) && (
             <TurnOffDialog
               stateId={state.id}
               flagKey={flagKey}
