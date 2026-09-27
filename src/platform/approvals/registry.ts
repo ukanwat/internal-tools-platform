@@ -1,5 +1,7 @@
 import { kycDecisionApprovalType } from "@/tools/kyc/approval-type";
 
+import { refundApprovalType } from "@/tools/refunds/approval-type";
+
 import type { ApprovalType } from "./types";
 
 export type ApprovalRegistry = {
@@ -26,4 +28,5 @@ export function createApprovalRegistry(
 /** Tools add their approval types here. */
 export const approvalRegistry = createApprovalRegistry([
   kycDecisionApprovalType,
+  refundApprovalType,
 ]);

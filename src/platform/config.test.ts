@@ -4,6 +4,7 @@ import {
   approvalProcessingTimeoutMs,
   kycLeadApprovalRiskLevels,
   kycVendorDashboardUrl,
+  refundApprovalThresholdMinor,
 } from "./config";
 
 afterEach(() => vi.unstubAllEnvs());
@@ -65,4 +66,28 @@ describe("kycLeadApprovalRiskLevels", () => {
     vi.stubEnv("KYC_LEAD_APPROVAL_RISK_LEVELS", "LOW");
     expect(kycLeadApprovalRiskLevels()).toEqual(["LOW", "HIGH"]);
   });
+});
+
+describe("refundApprovalThresholdMinor", () => {
+  it("defaults to $500", () => {
+    vi.stubEnv("REFUND_APPROVAL_THRESHOLD_USD", "");
+    expect(refundApprovalThresholdMinor()).toBe(50_000);
+  });
+
+  it.each([
+    ["750", 75_000],
+    ["1000.50", 100_050],
+    ["0", 0],
+  ])("reads %s dollars from the environment", (value, expected) => {
+    vi.stubEnv("REFUND_APPROVAL_THRESHOLD_USD", value);
+    expect(refundApprovalThresholdMinor()).toBe(expected);
+  });
+
+  it.each(["-5", "abc", "1.005", "1e6"])(
+    "ignores invalid value %s",
+    (value) => {
+      vi.stubEnv("REFUND_APPROVAL_THRESHOLD_USD", value);
+      expect(refundApprovalThresholdMinor()).toBe(50_000);
+    },
+  );
 });

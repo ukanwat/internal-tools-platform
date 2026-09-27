@@ -1,5 +1,6 @@
 import type { CurrentUser } from "@/platform/auth/types";
 import { kycCaseSensitiveSource } from "@/tools/kyc/sensitive-source";
+import { orderSensitiveSource } from "@/tools/refunds/sensitive-source";
 
 import type { SensitiveField } from "./fields";
 
@@ -36,4 +37,5 @@ export function createSensitiveSourceRegistry(
 /** Tools add a source for each record type that holds sensitive fields. */
 export const sensitiveSources = createSensitiveSourceRegistry([
   kycCaseSensitiveSource,
+  orderSensitiveSource,
 ]);

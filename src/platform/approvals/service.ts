@@ -8,6 +8,7 @@ import { approvalProcessingTimeoutMs } from "@/platform/config";
 import { db } from "@/platform/db";
 import { getIntegrations, type Integrations } from "@/platform/integrations";
 import { authorize } from "@/platform/permissions/guard";
+import { TimeoutError, withTimeout } from "@/platform/timeout";
 
 import { approvalRegistry, type ApprovalRegistry } from "./registry";
 import type { ApprovalExecutionContext } from "./types";
@@ -65,10 +66,15 @@ async function deny(
   return { ok: false, error: reason };
 }
 
+/**
+ * Pass `tx` to create the request inside the caller's transaction, so a tool's
+ * own record and its approval request are written together.
+ */
 export async function createApprovalRequest(
   actor: CurrentUser,
   input: { type: string; payload: unknown; reason: string },
   deps: ApprovalDeps = {},
+  tx?: Prisma.TransactionClient,
 ): Promise<ApprovalResult> {
   const { registry } = resolveDeps(deps);
   const type = registry.get(input.type);
@@ -87,38 +93,39 @@ export async function createApprovalRequest(
     return { ok: false, error: `Invalid request: ${errorMessage(error)}` };
   }
 
+  const write = async (client: Prisma.TransactionClient) => {
+    const refusal = await type.checkRequest({
+      tx: client,
+      payload: prepared.payload,
+      actor,
+    });
+    if (refusal) throw new RequestRefused(refusal);
+    const created = await client.approvalRequest.create({
+      data: {
+        type: type.key,
+        payload: JSON.parse(JSON.stringify(prepared.payload)),
+        summary: prepared.summary,
+        entityType: prepared.entity?.type,
+        entityId: prepared.entity?.id,
+        requestedById: actor.id,
+        requestReason: reason,
+      },
+    });
+    await recordAudit(
+      {
+        actor,
+        action: "approvals.request",
+        entity: auditEntity(created.id),
+        after: snapshot(created),
+        reason,
+      },
+      client,
+    );
+    return created;
+  };
   let request: ApprovalRequest;
   try {
-    request = await db.$transaction(async (tx) => {
-      const refusal = await type.checkRequest({
-        tx,
-        payload: prepared.payload,
-        actor,
-      });
-      if (refusal) throw new RequestRefused(refusal);
-      const created = await tx.approvalRequest.create({
-        data: {
-          type: type.key,
-          payload: JSON.parse(JSON.stringify(prepared.payload)),
-          summary: prepared.summary,
-          entityType: prepared.entity?.type,
-          entityId: prepared.entity?.id,
-          requestedById: actor.id,
-          requestReason: reason,
-        },
-      });
-      await recordAudit(
-        {
-          actor,
-          action: "approvals.request",
-          entity: auditEntity(created.id),
-          after: snapshot(created),
-          reason,
-        },
-        tx,
-      );
-      return created;
-    });
+    request = tx ? await write(tx) : await db.$transaction(write);
   } catch (error) {
     if (error instanceof RequestRefused) {
       await recordAudit({
@@ -338,9 +345,13 @@ export async function approveApprovalRequest(
     check.type.execute(executionContext(claimed, integrations)),
   );
   try {
-    await withTimeout(execution, processingTimeoutMs);
+    await withTimeout(
+      execution,
+      processingTimeoutMs,
+      timeoutReason(processingTimeoutMs),
+    );
   } catch (error) {
-    if (error instanceof ProcessingTimeout) {
+    if (error instanceof TimeoutError) {
       await markOutcomeUnknown(claimed, error.message, actor);
       void execution
         .then(
@@ -553,25 +564,8 @@ export async function settleApprovals(
   return { timedOut: stale.length, settled };
 }
 
-class ProcessingTimeout extends Error {}
-
 function timeoutReason(ms: number) {
   return `Timed out after ${Math.round(ms / 1000)}s in processing`;
-}
-
-async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(
-      () => reject(new ProcessingTimeout(timeoutReason(ms))),
-      ms,
-    );
-  });
-  try {
-    return await Promise.race([promise, timeout]);
-  } finally {
-    clearTimeout(timer);
-  }
 }
 
 function lowerFirst(text: string) {

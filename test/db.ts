@@ -8,7 +8,7 @@ import { db } from "@/platform/db";
 export function setupTestDatabase() {
   beforeEach(async () => {
     await db.$executeRawUnsafe(
-      `TRUNCATE "audit_log", "attachments", "approval_requests", "mock_payments", "kyc_cases", "users" CASCADE`,
+      `TRUNCATE "audit_log", "attachments", "approval_requests", "mock_payments", "refunds", "orders", "kyc_cases", "users" CASCADE`,
     );
     await db.user.createMany({ data: [...SEED_USERS] });
   });

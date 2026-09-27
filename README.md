@@ -1,6 +1,82 @@
 # Internal Tools Platform
 
-Next.js (App Router, TypeScript) + Tailwind CSS + shadcn/ui, Prisma with PostgreSQL, Vitest.
+## What this is
+
+A prototype built to answer one question for a fintech operations team: can we build our own
+internal tools, instead of building them in Power Apps?
+
+It is an ops console with a shared platform underneath (sign-in, role permissions, audit log,
+second-person approvals, masked sensitive fields, file attachments and integrations). Each tool
+is a thin layer on top that wires those pieces together, so the controls a regulated team needs
+are built once and every tool gets them.
+
+Stack: Next.js (App Router, TypeScript) + Tailwind CSS + shadcn/ui, Prisma with PostgreSQL, Vitest.
+
+## Tools
+
+The home page and sidebar list every tool from `TOOLS` in `src/platform/tools.ts`, filtered by the
+signed-in user's role.
+
+| Tool       | Route          | Status      | What it does                                                                                              |
+| ---------- | -------------- | ----------- | --------------------------------------------------------------------------------------------------------- |
+| Approvals  | `/approvals`   | Working     | Review requests that need a second person to sign off. Shared by every tool.                              |
+| Audit log  | `/admin/audit` | Working     | See who did what, when and why across every tool. Admins and compliance leads only (`audit.view`).        |
+| Refunds    | —              | Coming soon | Look up payments and request refunds. Permissions and roles are defined; the page isn't built yet.        |
+| KYC review | —              | Coming soon | Review identity checks and record compliance decisions. Permissions and roles are defined; not built yet. |
+
+Seeded users (one per role, picked on the sign-in page):
+
+| User           | Role                  | Can                                                          |
+| -------------- | --------------------- | ------------------------------------------------------------ |
+| Sam Support    | `SUPPORT`             | View and request refunds, view KYC cases                     |
+| Fiona Finance  | `FINANCE_APPROVER`    | View and approve refunds, reveal account numbers             |
+| Riley Reviewer | `COMPLIANCE_REVIEWER` | View and review KYC cases, reveal ID numbers                 |
+| Lee Lead       | `COMPLIANCE_LEAD`     | Review and decide KYC cases, view the audit log, reveal both |
+| Ada Admin      | `ADMIN`               | View the audit log                                           |
+
+The full role map is `ROLE_PERMISSIONS` in `src/platform/permissions/policy.ts`.
+
+## What's mocked and what's real
+
+**Mocked** (safe to demo, swap before any real use):
+
+- **Sign-in.** A "sign in as" picker over the seeded users, backed by a signed session cookie.
+  Replace with SSO in `src/platform/auth`.
+- **Payments provider.** `src/platform/integrations/payments/mock.ts` stands in for the payments
+  API, backed by a `mock_payments` table. Payment ids `pay_mock_decline` and `pay_mock_hang` make it
+  fail or hang, to exercise error and timeout paths.
+- **File storage.** Attachments are written to local disk (`ATTACHMENTS_STORAGE_DIR`). Swap for
+  object storage in `src/platform/integrations/storage`.
+- **Data.** All users, accounts and IDs are made up. Never add real customer data.
+
+**Real** (enforced by the platform and covered by tests):
+
+- Server-side permission checks on every server action and gated page, with denied attempts logged.
+- An append-only audit log in PostgreSQL (a trigger rejects `UPDATE` and `DELETE`), written in the
+  same transaction as each change, with before, after and a reason.
+- Second-person approvals: no self-approval, idempotent execution, timeout and outcome-unknown handling.
+- Server-side masking of sensitive fields, with reason-required, audited reveals.
+- Write-once attachments with content-based type checks, SHA-256 verification and audited downloads.
+- Limits and timeouts read from environment config (`src/platform/config.ts`).
+
+## Adding a new tool
+
+Follow the `add-internal-tool` skill in `.agents/skills/add-internal-tool/SKILL.md`. It holds the
+rules every tool must follow and a step-by-step checklist. Point your coding agent at it when
+building a tool, or read it yourself as a guide. In short:
+
+1. Write the tool's rules first (who views, requests, decides; what needs approval; sensitive fields;
+   config limits; outside systems) and list them in the PR description.
+2. Add models to `prisma/schema.prisma` and a migration.
+3. Add `<tool>.<verb>` permissions to `PERMISSIONS` / `ROLE_PERMISSIONS` and labels in
+   `src/platform/audit/labels.ts`.
+4. Put the code under `src/tools/<tool>/` (actions, service, approval type, components) and the page
+   under `src/app/(app)/<tool>/page.tsx`. Tools import from `src/platform`, never the other way round.
+5. Give the tool an `href` in `TOOLS` (`src/platform/tools.ts`) so it shows in the sidebar.
+6. Write a test for every rule, then run `npm run lint && npm run typecheck && npm test && npm run build`.
+
+The sections below ("Building a tool", "Approvals", "Sensitive fields", "Attachments") explain the
+platform APIs a tool uses.
 
 ## Requirements
 

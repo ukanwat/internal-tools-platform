@@ -38,6 +38,7 @@ model User {
   auditEntries AuditLog[]
   requested    ApprovalRequest[] @relation("requestedBy")
   decided      ApprovalRequest[] @relation("decidedBy")
+  refunds      Refund[]
   attachments  Attachment[]
   kycReviewed  KycCase[]         @relation("kycReviewedBy")
   kycDecided   KycCase[]         @relation("kycDecidedBy")
@@ -96,6 +97,58 @@ model ApprovalRequest {
   @@index([requestedById, createdAt])
   @@index([status, processingStartedAt])
   @@map("approval_requests")
+}
+
+// Refunds tool
+
+/// A customer order that support can refund. Fake data only.
+model Order {
+  id            String   @id @default(cuid())
+  /// Customer-facing order number, e.g. `ORD-1001`.
+  number        String   @unique
+  customerName  String   @map("customer_name")
+  customerEmail String   @map("customer_email")
+  amountMinor   Int      @map("amount_minor")
+  currency      String
+  /// Payment in the payments provider that refunds are paid against.
+  paymentId     String   @map("payment_id")
+  /// Bank account refunds are paid to. Sensitive: masked unless revealed.
+  accountNumber String   @map("account_number")
+  placedAt      DateTime @map("placed_at")
+  refunds       Refund[]
+
+  @@index([customerEmail])
+  @@map("orders")
+}
+
+enum RefundStatus {
+  PROCESSING
+  PAID
+  FAILED
+}
+
+model Refund {
+  id                String        @id @default(cuid())
+  orderId           String        @map("order_id")
+  order             Order         @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  amountMinor       Int           @map("amount_minor")
+  currency          String
+  reason            String
+  requestedById     String        @map("requested_by_id")
+  requestedBy       User          @relation(fields: [requestedById], references: [id], onDelete: Restrict)
+  /// Set for refunds that need approval; their status comes from the approval request.
+  approvalRequestId String?       @unique @map("approval_request_id")
+  /// Set for refunds paid straight away (at or under the approval threshold).
+  status            RefundStatus?
+  paidAt            DateTime?     @map("paid_at")
+  lastError         String?       @map("last_error")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+
+  @@index([orderId])
+  @@index([status, createdAt])
+  @@index([createdAt])
+  @@map("refunds")
 }
 
 /// Backing store for the mock payments integration.
