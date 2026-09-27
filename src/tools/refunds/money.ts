@@ -5,7 +5,7 @@ export function formatMoney(amountMinor: number, currency: string): string {
   );
 }
 
-const MAX_AMOUNT_MINOR = 100_000_000_00;
+export const MAX_AMOUNT_MINOR = 100_000_000_00;
 
 /** Parses a typed amount like `12.50` into minor units, or null if it isn't a positive amount. */
 export function parseAmountMinor(input: string): number | null {

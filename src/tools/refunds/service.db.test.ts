@@ -104,7 +104,11 @@ describe("requestRefund at or under the threshold", () => {
         actorId: support.id,
         reason: "Customer returned the item",
       },
-      { action: "refunds.paid", outcome: "SUCCESS" },
+      {
+        action: "refunds.paid",
+        outcome: "SUCCESS",
+        reason: "Paid through the payments provider",
+      },
     ]);
   });
 
@@ -149,7 +153,7 @@ describe("requestRefund at or under the threshold", () => {
     ).toMatchObject({ status: "PAID" });
   });
 
-  it("marks a stuck refund the provider never received as failed", async () => {
+  it("resends a stuck refund the provider never received under the same key", async () => {
     const order = await newOrder();
     const stuck = await db.refund.create({
       data: {
@@ -165,7 +169,19 @@ describe("requestRefund at or under the threshold", () => {
     expect(await settleRefunds(deps)).toEqual({ settled: 1 });
     expect(
       await db.refund.findUniqueOrThrow({ where: { id: stuck.id } }),
-    ).toMatchObject({ status: "FAILED" });
+    ).toMatchObject({ status: "PAID" });
+    expect(
+      await db.mockPayment.count({ where: { idempotencyKey: stuck.id } }),
+    ).toBe(1);
+    // A late original call is replayed, not paid again.
+    await expect(
+      payments.refund({
+        idempotencyKey: stuck.id,
+        paymentId: order.paymentId,
+        amountMinor: 1_000,
+        currency: "USD",
+      }),
+    ).resolves.toMatchObject({ replayed: true });
   });
 });
 
@@ -301,7 +317,7 @@ describe("requestRefund checks", () => {
     expect(
       await requestRefund(support, { ...input, reason: "  " }, deps),
     ).toMatchObject({ ok: false });
-    for (const amountMinor of [0, -5, 1.5]) {
+    for (const amountMinor of [0, -5, 1.5, 100_000_000_01]) {
       expect(
         await requestRefund(support, { ...input, amountMinor }, deps),
       ).toMatchObject({ ok: false });

@@ -13,7 +13,11 @@ import {
 import { LocalTime } from "@/platform/ui/local-time";
 import { RefundStateBadge } from "@/tools/refunds/components/refund-state-badge";
 import { formatMoney } from "@/tools/refunds/money";
-import { listRefunds, searchOrders } from "@/tools/refunds/query";
+import {
+  listRefunds,
+  ORDER_SEARCH_LIMIT,
+  searchOrders,
+} from "@/tools/refunds/query";
 import { settleRefunds } from "@/tools/refunds/service";
 import {
   parseRefundState,
@@ -74,6 +78,12 @@ export default async function RefundsPage({
         <h2 className="text-lg font-semibold tracking-tight">
           {q ? `Orders matching “${q}”` : "Recent orders"}
         </h2>
+        {orders.length === ORDER_SEARCH_LIMIT && (
+          <p className="text-muted-foreground text-sm">
+            Showing the {ORDER_SEARCH_LIMIT} most recent matches. Search by
+            order number or full email to narrow it down.
+          </p>
+        )}
         <div className="bg-card rounded-xl border">
           <DataTable
             rows={orders}

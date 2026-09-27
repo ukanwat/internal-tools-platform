@@ -18,7 +18,7 @@ import { authorize } from "@/platform/permissions/guard";
 import { TimeoutError, withTimeout } from "@/platform/timeout";
 
 import { REFUND_APPROVAL_TYPE } from "./approval-type";
-import { formatMoney } from "./money";
+import { formatMoney, MAX_AMOUNT_MINOR } from "./money";
 import { refundState, releasesAmount } from "./status";
 
 export type RefundDeps = {
@@ -60,6 +60,9 @@ export type RequestRefundResult =
       outcome: "paid" | "failed" | "processing" | "awaiting_approval";
     }
   | { ok: false; error: string };
+
+const PAID_REASON = "Paid through the payments provider";
+const CONFIRMED_PAID = "Confirmed as paid by the payments provider";
 
 /** Shown to people; the provider's own error goes to the audit log only. */
 export const PAYMENT_FAILED_MESSAGE =
@@ -133,7 +136,11 @@ export async function requestRefund(
 
   const reason = input.reason.trim();
   if (!reason) return { ok: false, error: "A reason is required" };
-  if (!Number.isInteger(input.amountMinor) || input.amountMinor <= 0) {
+  if (
+    !Number.isInteger(input.amountMinor) ||
+    input.amountMinor <= 0 ||
+    input.amountMinor > MAX_AMOUNT_MINOR
+  ) {
     return { ok: false, error: "Enter an amount greater than zero" };
   }
 
@@ -232,7 +239,7 @@ async function payRefund(
   );
   const settle = (result: Promise<unknown>) =>
     result.then(
-      () => finish(refund.id, "PAID", actor, deps.now),
+      () => finish(refund.id, "PAID", actor, deps.now, undefined, PAID_REASON),
       (error: unknown) =>
         finish(refund.id, "FAILED", actor, deps.now, errorMessage(error)),
     );
@@ -327,29 +334,57 @@ export async function settleRefunds(
       continue;
     }
     if (found?.status === "pending") continue;
-    const result =
-      found?.status === "succeeded"
-        ? await finish(
-            id,
-            "PAID",
-            null,
-            now,
-            undefined,
-            "Confirmed as paid by the payments provider",
-          )
-        : await finish(
-            id,
-            "FAILED",
-            null,
-            now,
-            undefined,
-            found
-              ? "Payments provider reported the refund as failed"
-              : "Payments provider never received the refund",
-          );
+    let result: Refund | null;
+    if (found?.status === "succeeded") {
+      result = await finish(id, "PAID", null, now, undefined, CONFIRMED_PAID);
+    } else if (found?.status === "failed") {
+      result = await finish(
+        id,
+        "FAILED",
+        null,
+        now,
+        undefined,
+        "Payments provider reported the refund as failed",
+      );
+    } else {
+      result = await resubmit(id, integrations, now, processingTimeoutMs);
+    }
     if (result) settled++;
   }
   return { settled };
+}
+
+/**
+ * The provider has no record of the refund, but the original call may still
+ * arrive. Sends it again under the same idempotency key so it is paid once,
+ * rather than failing it and freeing the amount for another payout.
+ */
+async function resubmit(
+  refundId: string,
+  integrations: Integrations,
+  now: () => Date,
+  timeoutMs: number,
+): Promise<Refund | null> {
+  const refund = await db.refund.findUniqueOrThrow({
+    where: { id: refundId },
+    include: { order: { select: { paymentId: true } } },
+  });
+  try {
+    await withTimeout(
+      integrations.payments.refund({
+        idempotencyKey: refund.id,
+        paymentId: refund.order.paymentId,
+        amountMinor: refund.amountMinor,
+        currency: refund.currency,
+      }),
+      timeoutMs,
+      "Payments provider timed out",
+    );
+  } catch (error) {
+    if (error instanceof TimeoutError) return null;
+    return finish(refundId, "FAILED", null, now, errorMessage(error));
+  }
+  return finish(refundId, "PAID", null, now, undefined, CONFIRMED_PAID);
 }
 
 function errorMessage(error: unknown): string {

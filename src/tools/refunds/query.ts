@@ -11,6 +11,7 @@ import { remainingRefundableMinor } from "./service";
 import { refundState, statusesFor, type RefundState } from "./status";
 
 const PAGE_SIZE = 20;
+export const ORDER_SEARCH_LIMIT = 20;
 
 export async function searchOrders(query: string) {
   const q = query.trim();
@@ -25,7 +26,7 @@ export async function searchOrders(query: string) {
         }
       : undefined,
     orderBy: { placedAt: "desc" },
-    take: PAGE_SIZE,
+    take: ORDER_SEARCH_LIMIT,
     select: {
       id: true,
       number: true,
