@@ -4,6 +4,7 @@ import type { AuditOutcome } from "@/generated/prisma/enums";
 import type { Prisma } from "@/generated/prisma/client";
 import type { CurrentUser } from "@/platform/auth/types";
 import { db, type DbClient } from "@/platform/db";
+import { redactSensitive } from "@/platform/sensitive/fields";
 
 export type AuditEntry = {
   /** Who did it. `null` for anonymous requests (e.g. denied before sign-in). */
@@ -51,8 +52,13 @@ export async function recordAudit(
   });
 }
 
-/** Snapshots a value as plain JSON (Dates to ISO strings, Decimals to strings). */
+/**
+ * Snapshots a value as plain JSON (Dates to ISO strings, Decimals to strings)
+ * with sensitive fields masked.
+ */
 function toJson(value: unknown): Prisma.InputJsonValue | undefined {
   if (value === undefined || value === null) return undefined;
-  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+  return redactSensitive(
+    JSON.parse(JSON.stringify(value)),
+  ) as Prisma.InputJsonValue;
 }
