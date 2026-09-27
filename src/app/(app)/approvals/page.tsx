@@ -1,11 +1,12 @@
 import {
+  approvalRegistry,
   failStaleApprovals,
   listApprovals,
   parseApprovalTab,
 } from "@/platform/approvals";
 import { ApprovalsList } from "@/platform/approvals/components/approvals-list";
 import { requireUser } from "@/platform/auth";
-import { LinkTabs, PageHeader } from "@/platform/ui";
+import { LinkTabs, PageHeader, Pagination } from "@/platform/ui";
 
 const TAB_LABELS = {
   waiting: "Waiting for me",
@@ -17,10 +18,17 @@ export default async function ApprovalsPage({
   searchParams,
 }: PageProps<"/approvals">) {
   const user = await requireUser();
-  const tab = parseApprovalTab((await searchParams).tab);
+  const params = await searchParams;
+  const tab = parseApprovalTab(params.tab);
+  const requestedPage = Number(params.page);
 
   await failStaleApprovals();
-  const { requests, counts } = await listApprovals(user, tab);
+  const { requests, counts, page, pageCount } = await listApprovals(
+    user,
+    tab,
+    approvalRegistry,
+    Number.isInteger(requestedPage) ? requestedPage : 1,
+  );
 
   return (
     <main className="flex flex-1 flex-col gap-6 p-8">
@@ -37,6 +45,11 @@ export default async function ApprovalsPage({
         }))}
       />
       <ApprovalsList requests={requests} />
+      <Pagination
+        page={page}
+        pageCount={pageCount}
+        hrefForPage={(p) => `/approvals?tab=${tab}&page=${p}`}
+      />
     </main>
   );
 }

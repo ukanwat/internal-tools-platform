@@ -15,6 +15,11 @@ describe("approvalProcessingTimeoutMs", () => {
     expect(approvalProcessingTimeoutMs()).toBe(60_000);
   });
 
+  it("caps values above the timer limit", () => {
+    vi.stubEnv("APPROVAL_PROCESSING_TIMEOUT_MS", "9999999999");
+    expect(approvalProcessingTimeoutMs()).toBe(2 ** 31 - 1);
+  });
+
   it.each(["0", "-5", "abc", "1.5"])("ignores invalid value %s", (value) => {
     vi.stubEnv("APPROVAL_PROCESSING_TIMEOUT_MS", value);
     expect(approvalProcessingTimeoutMs()).toBe(300_000);

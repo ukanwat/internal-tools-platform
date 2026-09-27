@@ -1,5 +1,6 @@
 import "server-only";
 
+import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/platform/db";
 
 import { PaymentsError, type PaymentsClient } from "./types";
@@ -29,16 +30,29 @@ export function createMockPaymentsClient(): PaymentsClient {
         throw new PaymentsError("Refund amount must be a positive integer");
       }
 
-      const created = await db.mockPayment.create({
-        data: {
-          idempotencyKey,
-          kind: "refund",
-          paymentId,
-          amountMinor,
-          currency,
-        },
-      });
-      return { refundId: created.id, replayed: false };
+      try {
+        const created = await db.mockPayment.create({
+          data: {
+            idempotencyKey,
+            kind: "refund",
+            paymentId,
+            amountMinor,
+            currency,
+          },
+        });
+        return { refundId: created.id, replayed: false };
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2002"
+        ) {
+          const winner = await db.mockPayment.findUniqueOrThrow({
+            where: { idempotencyKey },
+          });
+          return { refundId: winner.id, replayed: true };
+        }
+        throw error;
+      }
     },
   };
 }
