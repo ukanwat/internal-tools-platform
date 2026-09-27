@@ -34,6 +34,24 @@ export const SEED_USERS: readonly SeedUser[] = [
     role: "COMPLIANCE_LEAD",
   },
   {
+    id: "user_engineer",
+    email: "eli.engineer@example.com",
+    name: "Eli Engineer",
+    role: "ENGINEER",
+  },
+  {
+    id: "user_eng_manager",
+    email: "mia.manager@example.com",
+    name: "Mia Manager",
+    role: "ENG_MANAGER",
+  },
+  {
+    id: "user_eng_manager_2",
+    email: "max.manager@example.com",
+    name: "Max Manager",
+    role: "ENG_MANAGER",
+  },
+  {
     id: "user_admin",
     email: "ada.admin@example.com",
     name: "Ada Admin",

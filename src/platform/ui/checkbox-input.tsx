@@ -11,17 +11,25 @@ export function CheckboxInput({
   name,
   label,
   defaultChecked,
+  onCheckedChange,
   className,
 }: {
   id: string;
   name: string;
   label: string;
   defaultChecked?: boolean;
+  onCheckedChange?: (checked: boolean) => void;
   className?: string;
 }) {
   return (
     <div className={cn("flex items-center gap-2", className)}>
-      <Checkbox id={id} name={name} value="1" defaultChecked={defaultChecked} />
+      <Checkbox
+        id={id}
+        name={name}
+        value="1"
+        defaultChecked={defaultChecked}
+        onCheckedChange={(checked) => onCheckedChange?.(checked)}
+      />
       <Label htmlFor={id} className="font-normal">
         {label}
       </Label>

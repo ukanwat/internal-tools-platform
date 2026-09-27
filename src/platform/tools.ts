@@ -1,6 +1,6 @@
 import type { Permission } from "@/platform/permissions/policy";
 
-export type ToolIcon = "approvals" | "audit" | "refunds" | "kyc";
+export type ToolIcon = "approvals" | "audit" | "refunds" | "kyc" | "flags";
 
 export type ToolDefinition = {
   key: string;
@@ -40,6 +40,16 @@ export const TOOLS: ToolDefinition[] = [
     description: "Review identity checks and record compliance decisions.",
     icon: "kyc",
     permission: "kyc.view",
+  },
+  {
+    key: "flags",
+    kind: "tool",
+    name: "Feature flags",
+    description:
+      "Change flags in staging, request production rollouts, and turn flags off.",
+    icon: "flags",
+    href: "/flags",
+    permission: "flags.view",
   },
   {
     key: "audit",
