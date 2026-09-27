@@ -48,6 +48,15 @@ describe("sanitizeFilename", () => {
     expect(long).toHaveLength(200);
     expect(long.endsWith(".pdf")).toBe(true);
   });
+
+  it("never splits a character when truncating", () => {
+    const name = sanitizeFilename(`${"x".repeat(199)}😀😀😀`);
+    expect(Array.from(name)).toHaveLength(200);
+    expect(() => contentDisposition(name)).not.toThrow();
+    expect(() =>
+      contentDisposition(sanitizeFilename("a\uD800b.pdf")),
+    ).not.toThrow();
+  });
 });
 
 describe("contentDisposition", () => {

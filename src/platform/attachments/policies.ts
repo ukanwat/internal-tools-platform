@@ -1,7 +1,11 @@
 import type { CurrentUser } from "@/platform/auth/types";
 import type { Permission } from "@/platform/permissions/policy";
 
-import type { AttachmentContentType } from "./files";
+import {
+  DEFAULT_ALLOWED_TYPES,
+  DEFAULT_MAX_BYTES,
+  type AttachmentContentType,
+} from "./files";
 
 /**
  * A tool's rules for files on one record type. The platform checks the role
@@ -19,9 +23,15 @@ export type AttachmentPolicy = {
   canUpload: (entityId: string, actor: CurrentUser) => Promise<boolean>;
   /** Defaults to PDF, PNG and JPEG. */
   allowedTypes?: readonly AttachmentContentType[];
-  /** Defaults to 10 MB. */
+  /** Defaults to, and is capped at, 10 MB. */
   maxBytes?: number;
 };
+
+export const allowedTypesFor = (policy: AttachmentPolicy) =>
+  policy.allowedTypes ?? DEFAULT_ALLOWED_TYPES;
+
+export const maxBytesFor = (policy: AttachmentPolicy) =>
+  Math.min(policy.maxBytes ?? DEFAULT_MAX_BYTES, DEFAULT_MAX_BYTES);
 
 export type AttachmentPolicyRegistry = {
   get(entityType: string): AttachmentPolicy | undefined;

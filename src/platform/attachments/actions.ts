@@ -2,7 +2,8 @@
 
 import { requirePermission } from "@/platform/permissions/guard";
 
-import { attachmentPolicies } from "./policies";
+import { formatFileSize } from "./files";
+import { attachmentPolicies, maxBytesFor } from "./policies";
 import { uploadAttachment as upload } from "./service";
 
 export type UploadState = { ok: boolean; message: string } | null;
@@ -27,6 +28,12 @@ export async function uploadAttachment(
   const entity = { type: entityType, id: entityId };
   const actor = await requirePermission(policy.uploadPermission, entity);
 
+  if (file.size > maxBytesFor(policy)) {
+    return {
+      ok: false,
+      message: `Files must be ${formatFileSize(maxBytesFor(policy))} or smaller`,
+    };
+  }
   const result = await upload(actor, {
     entity,
     file: { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) },

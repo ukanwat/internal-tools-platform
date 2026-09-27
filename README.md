@@ -162,7 +162,7 @@ platform enforces it:
   canView: (caseId, actor) => canOpenCase(caseId, actor), // record-level check
   canUpload: (caseId, actor) => isOpen(caseId),
   allowedTypes: ["application/pdf", "image/jpeg"], // default: PDF, PNG, JPEG
-  maxBytes: 5 * 1024 * 1024, // default: 10 MB
+  maxBytes: 5 * 1024 * 1024, // default and maximum: 10 MB
 }
 ```
 

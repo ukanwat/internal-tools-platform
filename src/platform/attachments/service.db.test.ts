@@ -288,6 +288,30 @@ describe("listAttachments", () => {
   });
 });
 
+describe("maxBytes", () => {
+  it("is capped at the platform limit", async () => {
+    const generous = createAttachmentPolicyRegistry([
+      {
+        entityType: "Big",
+        viewPermission: "kyc.view",
+        uploadPermission: "kyc.review",
+        canView: async () => true,
+        canUpload: async () => true,
+        maxBytes: 50 * 1024 * 1024,
+      },
+    ]);
+    expect(
+      await listAttachments(
+        reviewer,
+        { type: "Big", id: "b" },
+        {
+          policies: generous,
+        },
+      ),
+    ).toMatchObject({ maxBytes: 10 * 1024 * 1024 });
+  });
+});
+
 describe("attachments table", () => {
   it("rejects updates and deletes", async () => {
     const attachment = await uploadOk(setup());

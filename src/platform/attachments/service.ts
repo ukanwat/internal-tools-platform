@@ -14,15 +14,14 @@ import { hasPermission } from "@/platform/permissions/policy";
 
 import {
   ATTACHMENT_CONTENT_TYPES,
-  DEFAULT_ALLOWED_TYPES,
-  DEFAULT_MAX_BYTES,
   detectContentType,
   formatFileSize,
   sanitizeFilename,
 } from "./files";
 import {
+  allowedTypesFor,
   attachmentPolicies,
-  type AttachmentPolicy,
+  maxBytesFor,
   type AttachmentPolicyRegistry,
 } from "./policies";
 import type { AttachmentEntity, AttachmentList, AttachmentView } from "./types";
@@ -31,11 +30,6 @@ export type AttachmentDeps = {
   policies?: AttachmentPolicyRegistry;
   storage?: FileStorage;
 };
-
-const allowedTypes = (policy: AttachmentPolicy) =>
-  policy.allowedTypes ?? DEFAULT_ALLOWED_TYPES;
-const maxBytes = (policy: AttachmentPolicy) =>
-  policy.maxBytes ?? DEFAULT_MAX_BYTES;
 
 const sha256 = (bytes: Uint8Array) =>
   createHash("sha256").update(bytes).digest("hex");
@@ -90,8 +84,8 @@ export async function listAttachments(
     entity,
     canView,
     canUpload,
-    allowedTypes: allowedTypes(policy),
-    maxBytes: maxBytes(policy),
+    allowedTypes: allowedTypesFor(policy),
+    maxBytes: maxBytesFor(policy),
     attachments: rows.map(toView),
   };
 }
@@ -136,14 +130,14 @@ export async function uploadAttachment(
 
   if (file.bytes.byteLength === 0)
     return { ok: false, error: "The file is empty" };
-  if (file.bytes.byteLength > maxBytes(policy))
+  if (file.bytes.byteLength > maxBytesFor(policy))
     return {
       ok: false,
-      error: `Files must be ${formatFileSize(maxBytes(policy))} or smaller`,
+      error: `Files must be ${formatFileSize(maxBytesFor(policy))} or smaller`,
     };
   const contentType = detectContentType(file.bytes);
-  if (!contentType || !allowedTypes(policy).includes(contentType)) {
-    const labels = allowedTypes(policy).map(
+  if (!contentType || !allowedTypesFor(policy).includes(contentType)) {
+    const labels = allowedTypesFor(policy).map(
       (type) => ATTACHMENT_CONTENT_TYPES[type].label,
     );
     return { ok: false, error: `Allowed file types: ${labels.join(", ")}` };

@@ -13,6 +13,7 @@ export const DEFAULT_ALLOWED_TYPES: readonly AttachmentContentType[] = [
   "image/jpeg",
 ];
 
+/** Also the ceiling: the server action body limit in next.config.ts allows no more. */
 export const DEFAULT_MAX_BYTES = 10 * 1024 * 1024;
 
 function startsWith(bytes: Uint8Array, signature: readonly number[], at = 0) {
@@ -41,12 +42,13 @@ const UNSAFE_CHARACTERS = /[\p{Cc}\u202a-\u202e\u2066-\u2069]/gu;
 /** A display-safe file name: no directories, control or bidi characters. */
 export function sanitizeFilename(name: string): string {
   const base = name.split(/[\\/]/).pop() ?? "";
-  const cleaned = base.replace(UNSAFE_CHARACTERS, "").trim();
+  const cleaned = base.toWellFormed().replace(UNSAFE_CHARACTERS, "").trim();
   if (!cleaned || cleaned === "." || cleaned === "..") return "file";
-  if (cleaned.length <= MAX_FILENAME_LENGTH) return cleaned;
-  const dot = cleaned.lastIndexOf(".");
-  const ext = dot > 0 && cleaned.length - dot <= 10 ? cleaned.slice(dot) : "";
-  return cleaned.slice(0, MAX_FILENAME_LENGTH - ext.length) + ext;
+  const chars = Array.from(cleaned);
+  if (chars.length <= MAX_FILENAME_LENGTH) return cleaned;
+  const dot = chars.lastIndexOf(".");
+  const ext = dot > 0 && chars.length - dot <= 10 ? chars.slice(dot) : [];
+  return [...chars.slice(0, MAX_FILENAME_LENGTH - ext.length), ...ext].join("");
 }
 
 /** `Content-Disposition` that always downloads, with a UTF-8 file name. */
