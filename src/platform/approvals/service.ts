@@ -121,6 +121,13 @@ export async function createApprovalRequest(
     });
   } catch (error) {
     if (error instanceof RequestRefused) {
+      await recordAudit({
+        actor,
+        action: "approvals.request",
+        outcome: "DENIED",
+        entity: prepared.entity,
+        reason: error.message,
+      });
       return { ok: false, error: error.message };
     }
     throw error;

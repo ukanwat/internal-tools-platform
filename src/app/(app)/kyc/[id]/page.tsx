@@ -53,6 +53,7 @@ export default async function KycCasePage({ params }: PageProps<"/kyc/[id]">) {
               caseId={kycCase.id}
               customerName={kycCase.customerName}
               leadApprovalRequired={detail.leadApprovalRequired}
+              canApprove={detail.canApprove}
             />
           )
         }

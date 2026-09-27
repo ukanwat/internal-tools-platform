@@ -12,9 +12,11 @@ import {
 } from "@/platform/attachments/service";
 import type { CurrentUser } from "@/platform/auth/types";
 import { db } from "@/platform/db";
+import { getIntegrations } from "@/platform/integrations";
 import { createMemoryFileStorage } from "@/platform/integrations/storage";
 import { revealSensitiveValue } from "@/platform/sensitive/service";
 
+import { kycDecisionApprovalType } from "./approval-type";
 import { kycEntity } from "./cases";
 import { decideKycCase, getKycCaseDetail, listKycCases } from "./service";
 import { SEED_KYC_CASES } from "./seed-cases";
@@ -267,6 +269,62 @@ describe("high risk cases", () => {
       message: "This case is already waiting for a compliance lead",
     });
     expect(await db.approvalRequest.count()).toBe(1);
+    expect(
+      await db.auditLog.findFirstOrThrow({
+        where: { action: "approvals.request", outcome: "DENIED" },
+      }),
+    ).toMatchObject({
+      actorId: lead.id,
+      entityType: "KycCase",
+      entityId: HIGH,
+      reason: "This case is already waiting for a compliance lead",
+    });
+  });
+
+  it("are not decided by an execution that outlived its timeout", async () => {
+    const request = await submitHighRisk();
+    await db.approvalRequest.update({
+      where: { id: request.id },
+      data: { status: "OUTCOME_UNKNOWN", decidedById: lead.id },
+    });
+    await expect(
+      kycDecisionApprovalType.execute({
+        request: {
+          id: request.id,
+          requestedById: reviewer.id,
+          decidedById: lead.id,
+        },
+        payload: request.payload,
+        idempotencyKey: request.id,
+        integrations: getIntegrations(),
+      }),
+    ).rejects.toThrow("Approval request is OUTCOME_UNKNOWN");
+    expect((await caseOf(HIGH)).status).toBe("OPEN");
+  });
+});
+
+describe("vendor check results", () => {
+  it("are needed to approve a case, but not to reject it", async () => {
+    const approve = await decideKycCase(reviewer, {
+      caseId: UNAVAILABLE,
+      decision: "approve",
+      reason: "Looks fine",
+    });
+    expect(approve).toEqual({
+      ok: false,
+      message: "Can't approve without the KYC vendor's check results",
+    });
+    expect(
+      await db.auditLog.findFirstOrThrow({ where: { action: "kyc.approve" } }),
+    ).toMatchObject({ outcome: "DENIED", entityId: UNAVAILABLE });
+    expect((await caseOf(UNAVAILABLE)).status).toBe("OPEN");
+
+    const reject = await decideKycCase(reviewer, {
+      caseId: UNAVAILABLE,
+      decision: "reject",
+      reason: "Customer withdrew",
+    });
+    expect(reject.ok).toBe(true);
   });
 });
 

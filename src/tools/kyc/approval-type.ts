@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { Prisma } from "@/generated/prisma/client";
 import { defineApprovalType } from "@/platform/approvals/types";
 import { recordAudit } from "@/platform/audit/record";
 import { db } from "@/platform/db";
@@ -63,9 +64,13 @@ export const kycDecisionApprovalType = defineApprovalType<KycDecisionPayload>({
   },
   async execute({ request, payload }) {
     await db.$transaction(async (tx) => {
+      const status = await lockRequestStatus(tx, request.id);
       const before = await lockKycCase(tx, payload.caseId);
       if (!before) throw new Error("KYC case not found");
       if (before.approvalRequestId === request.id) return;
+      if (status !== "PROCESSING") {
+        throw new Error(`Approval request is ${status ?? "missing"}`);
+      }
       if (before.status !== "OPEN") {
         throw new Error(`KYC case is already ${before.status}`);
       }
@@ -101,10 +106,24 @@ export const kycDecisionApprovalType = defineApprovalType<KycDecisionPayload>({
     });
   },
   async checkOutcome({ request, payload }) {
-    const kycCase = await db.kycCase.findUnique({
-      where: { id: payload.caseId },
-      select: { approvalRequestId: true },
+    // Only called once the request has left PROCESSING, after which execute
+    // refuses to apply; the lock waits out an execution already under way.
+    return db.$transaction(async (tx) => {
+      await lockRequestStatus(tx, request.id);
+      const kycCase = await tx.kycCase.findUnique({
+        where: { id: payload.caseId },
+        select: { approvalRequestId: true },
+      });
+      return kycCase?.approvalRequestId === request.id ? "completed" : "failed";
     });
-    return kycCase?.approvalRequestId === request.id ? "completed" : "failed";
   },
 });
+
+async function lockRequestStatus(
+  tx: Prisma.TransactionClient,
+  requestId: string,
+): Promise<string | null> {
+  const rows = await tx.$queryRaw<{ status: string }[]>`
+    SELECT status::text AS status FROM approval_requests WHERE id = ${requestId} FOR UPDATE`;
+  return rows[0]?.status ?? null;
+}

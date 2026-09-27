@@ -168,6 +168,7 @@ export async function getKycCaseDetail(
     leadApprovalRequired,
     awaitingLeadApproval: activeApproval != null,
     approvals,
+    canApprove: check != null,
     canDecide:
       kycCase.status === "OPEN" &&
       activeApproval == null &&
@@ -195,6 +196,18 @@ export async function decideKycCase(
 
   const kycCase = await db.kycCase.findUnique({ where: { id: input.caseId } });
   if (!kycCase) return { ok: false, message: "Case not found" };
+
+  if (input.decision === "approve" && !(await hasVendorCheck(kycCase, deps))) {
+    const message = "Can't approve without the KYC vendor's check results";
+    await recordAudit({
+      actor,
+      action,
+      outcome: "DENIED",
+      entity,
+      reason: `${message}.`,
+    });
+    return { ok: false, message };
+  }
 
   if (needsLeadApproval(kycCase.riskLevel)) {
     const result = await createApprovalRequest(
@@ -266,4 +279,15 @@ export async function decideKycCase(
     ok: true,
     message: input.decision === "approve" ? "Case approved" : "Case rejected",
   };
+}
+
+async function hasVendorCheck(
+  kycCase: { vendorCheckId: string },
+  { integrations = getIntegrations() }: KycDeps,
+): Promise<boolean> {
+  try {
+    return (await integrations.kyc.getCheck(kycCase.vendorCheckId)) != null;
+  } catch {
+    return false;
+  }
 }
