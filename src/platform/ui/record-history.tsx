@@ -13,6 +13,8 @@ type Props = {
   viewer: CurrentUser;
   entityType: string;
   entityId: string;
+  /** Other records whose entries belong in the same timeline, e.g. a linked approval request. */
+  related?: { type: string; id: string }[];
 };
 
 /**
@@ -24,12 +26,13 @@ export async function listRecordHistory({
   viewer,
   entityType,
   entityId,
+  related = [],
 }: Props) {
   const fullAccess = hasPermission(viewer.role, "audit.view");
+  const records = [{ type: entityType, id: entityId }, ...related];
   const entries = await db.auditLog.findMany({
     where: {
-      entityType,
-      entityId,
+      OR: records.map((r) => ({ entityType: r.type, entityId: r.id })),
       ...(fullAccess ? {} : { outcome: { not: "DENIED" } }),
     },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],

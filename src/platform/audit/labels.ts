@@ -25,6 +25,9 @@ const ACTIONS: Record<string, string> = {
   "approvals.fail": "Request processing failed",
   "approvals.outcome_unknown": "Request outcome unknown",
   "sensitive.reveal": "Revealed sensitive data",
+  "refunds.create": "Refund requested",
+  "refunds.paid": "Refund paid",
+  "refunds.payment_failed": "Refund payment failed",
 };
 
 /** Actions hidden from the audit log unless asked for. */

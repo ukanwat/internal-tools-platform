@@ -1,5 +1,10 @@
 export { DataTable, type DataTableColumn } from "./data-table";
-export { FilterBar, type FilterField, type FilterToggle } from "./filter-bar";
+export {
+  FilterBar,
+  type FilterField,
+  type FilterSearch,
+  type FilterToggle,
+} from "./filter-bar";
 export { formatTimestamp } from "./format";
 export { LinkTabs, type LinkTab } from "./link-tabs";
 export { AUDIT_OUTCOME_LABELS, AuditOutcomeBadge } from "./outcome-badge";
