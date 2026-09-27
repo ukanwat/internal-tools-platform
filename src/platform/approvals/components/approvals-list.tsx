@@ -1,3 +1,4 @@
+import type { CurrentUser } from "@/platform/auth/types";
 import { ROLE_LABELS } from "@/platform/permissions/roles";
 import { formatTimestamp } from "@/platform/ui";
 import { RecordHistory } from "@/platform/ui/record-history";
@@ -6,7 +7,13 @@ import type { ApprovalListItem } from "../query";
 import { ApprovalStatusBadge } from "./approval-status-badge";
 import { DecisionForm } from "./decision-form";
 
-export function ApprovalsList({ requests }: { requests: ApprovalListItem[] }) {
+export function ApprovalsList({
+  requests,
+  viewer,
+}: {
+  requests: ApprovalListItem[];
+  viewer: CurrentUser;
+}) {
   if (requests.length === 0) {
     return (
       <p className="text-muted-foreground py-8 text-center text-sm">
@@ -44,14 +51,13 @@ export function ApprovalsList({ requests }: { requests: ApprovalListItem[] }) {
               </p>
             )}
             {request.lastError && (
-              <p className="text-destructive">
-                Last attempt failed: {request.lastError}
-              </p>
+              <p className="text-destructive">{request.lastError}</p>
             )}
             <details>
               <summary className="cursor-pointer text-xs">History</summary>
               <div className="mt-2">
                 <RecordHistory
+                  viewer={viewer}
                   entityType="ApprovalRequest"
                   entityId={request.id}
                 />

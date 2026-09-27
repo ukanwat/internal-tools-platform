@@ -4,6 +4,7 @@ import { StatusBadge, type StatusTone } from "@/platform/ui";
 const STATUSES: Record<ApprovalStatus, { label: string; tone: StatusTone }> = {
   PENDING: { label: "Pending", tone: "warning" },
   PROCESSING: { label: "Processing", tone: "info" },
+  OUTCOME_UNKNOWN: { label: "Outcome unknown", tone: "danger" },
   COMPLETED: { label: "Completed", tone: "success" },
   REJECTED: { label: "Rejected", tone: "danger" },
 };

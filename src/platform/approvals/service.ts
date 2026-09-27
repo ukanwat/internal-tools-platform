@@ -1,6 +1,7 @@
 import "server-only";
 
-import type { ApprovalRequest } from "@/generated/prisma/client";
+import type { ApprovalRequest, Prisma } from "@/generated/prisma/client";
+import type { ApprovalStatus } from "@/generated/prisma/enums";
 import { recordAudit } from "@/platform/audit/record";
 import type { CurrentUser } from "@/platform/auth/types";
 import { approvalProcessingTimeoutMs } from "@/platform/config";
@@ -9,6 +10,7 @@ import { getIntegrations, type Integrations } from "@/platform/integrations";
 import { authorize } from "@/platform/permissions/guard";
 
 import { approvalRegistry, type ApprovalRegistry } from "./registry";
+import type { ApprovalExecutionContext } from "./types";
 
 export type ApprovalDeps = {
   registry?: ApprovalRegistry;
@@ -195,7 +197,7 @@ export async function rejectApprovalRequest(
   deps: ApprovalDeps = {},
 ): Promise<ApprovalResult> {
   const { registry, now } = resolveDeps(deps);
-  await failStaleApprovals(deps);
+  await settleApprovals(deps);
 
   const check = await checkDecision(
     actor,
@@ -253,7 +255,7 @@ export async function approveApprovalRequest(
 ): Promise<ApprovalResult> {
   const { registry, integrations, now, processingTimeoutMs } =
     resolveDeps(deps);
-  await failStaleApprovals(deps);
+  await settleApprovals(deps);
 
   const check = await checkDecision(
     actor,
@@ -305,143 +307,234 @@ export async function approveApprovalRequest(
     );
   }
 
+  const execution = check.type.execute(executionContext(claimed, integrations));
   try {
-    await withTimeout(
-      check.type.execute({
-        request: {
-          id: claimed.id,
-          requestedById: claimed.requestedById,
-          decidedById: actor.id,
-        },
-        payload: claimed.payload,
-        idempotencyKey: claimed.id,
-        integrations,
-      }),
-      processingTimeoutMs,
-    );
+    await withTimeout(execution, processingTimeoutMs);
   } catch (error) {
-    const failed = await markFailed(claimed, errorMessage(error), actor);
+    if (error instanceof ProcessingTimeout) {
+      await markOutcomeUnknown(claimed, error.message, actor);
+      void execution
+        .then(
+          () => {},
+          () => {},
+        )
+        .then(() => settleOne(requestId, registry, integrations, now))
+        .catch((settleError) => console.error(settleError));
+      return {
+        ok: false,
+        error: `Approved, but ${lowerFirst(TIMEOUT_MESSAGE)}`,
+      };
+    }
+    await markFailed(claimed, errorMessage(error), actor);
     return {
       ok: false,
-      error: `Approved, but processing failed: ${failed.lastError}`,
+      error: `Approved, but ${lowerFirst(FAILURE_MESSAGE)}`,
     };
   }
 
-  const completed = await db.$transaction(async (tx) => {
+  const completed = await transition(
+    claimed,
+    "PROCESSING",
+    { status: "COMPLETED", completedAt: now() },
+    { actor, action: "approvals.complete" },
+  );
+  if (completed) return { ok: true, request: completed };
+
+  // The request timed out while this execution was still running.
+  const settled = await settleOne(requestId, registry, integrations, now);
+  return settled?.status === "COMPLETED"
+    ? { ok: true, request: settled }
+    : { ok: false, error: `Approved, but ${lowerFirst(TIMEOUT_MESSAGE)}` };
+}
+
+/** Shown to users; the underlying error is kept in the audit log only. */
+const FAILURE_MESSAGE = "Processing failed. The request is back to pending.";
+const TIMEOUT_MESSAGE =
+  "Processing timed out. It will be completed or returned to pending once its outcome is known.";
+
+function executionContext(
+  request: ApprovalRequest,
+  integrations: Integrations,
+): ApprovalExecutionContext<unknown> {
+  if (!request.decidedById) throw new Error("Request has no decider");
+  return {
+    request: {
+      id: request.id,
+      requestedById: request.requestedById,
+      decidedById: request.decidedById,
+    },
+    payload: request.payload,
+    idempotencyKey: request.id,
+    integrations,
+  };
+}
+
+/**
+ * Moves a request out of `from` and audits it. No-op (returns null) if the
+ * request already moved on, e.g. because another path settled it first.
+ */
+async function transition(
+  request: ApprovalRequest,
+  from: ApprovalStatus,
+  data: Prisma.ApprovalRequestUpdateManyMutationInput,
+  audit: {
+    actor: CurrentUser | null;
+    action: string;
+    outcome?: "SUCCESS" | "FAILURE";
+    reason?: string;
+  },
+): Promise<ApprovalRequest | null> {
+  return db.$transaction(async (tx) => {
     const { count } = await tx.approvalRequest.updateMany({
       where: {
-        id: requestId,
-        status: "PROCESSING",
-        processingStartedAt: startedAt,
+        id: request.id,
+        status: from,
+        processingStartedAt: request.processingStartedAt,
       },
-      data: { status: "COMPLETED", completedAt: now() },
+      data,
     });
     if (count === 0) return null;
     const after = await tx.approvalRequest.findUniqueOrThrow({
-      where: { id: requestId },
+      where: { id: request.id },
     });
     await recordAudit(
       {
-        actor,
-        action: "approvals.complete",
-        entity: auditEntity(requestId),
-        before: snapshot(claimed),
+        ...audit,
+        entity: auditEntity(request.id),
+        before: snapshot(request),
         after: snapshot(after),
       },
       tx,
     );
     return after;
   });
-
-  if (!completed) {
-    await recordAudit({
-      actor,
-      action: "approvals.complete",
-      outcome: "FAILURE",
-      entity: auditEntity(requestId),
-      reason: "Processing finished after the request had already timed out",
-    });
-    return {
-      ok: false,
-      error: "Processing finished after the request timed out",
-    };
-  }
-  return { ok: true, request: completed };
 }
 
-/**
- * Moves a PROCESSING request back to PENDING with the error, and logs it.
- * No-op if another path already moved it.
- */
-async function markFailed(
+const backToPending = {
+  status: "PENDING",
+  lastError: FAILURE_MESSAGE,
+  processingStartedAt: null,
+  decidedById: null,
+  decisionReason: null,
+  decidedAt: null,
+} as const;
+
+function markFailed(
   request: ApprovalRequest,
   error: string,
   actor: CurrentUser | null,
-): Promise<ApprovalRequest> {
-  return db.$transaction(async (tx) => {
-    const { count } = await tx.approvalRequest.updateMany({
-      where: {
-        id: request.id,
-        status: "PROCESSING",
-        processingStartedAt: request.processingStartedAt,
-      },
-      data: {
-        status: "PENDING",
-        lastError: error,
-        processingStartedAt: null,
-        decidedById: null,
-        decisionReason: null,
-        decidedAt: null,
-      },
-    });
-    const after = await tx.approvalRequest.findUniqueOrThrow({
-      where: { id: request.id },
-    });
-    if (count > 0) {
-      await recordAudit(
-        {
-          actor,
-          action: "approvals.fail",
-          outcome: "FAILURE",
-          entity: auditEntity(request.id),
-          before: snapshot(request),
-          after: snapshot(after),
-          reason: error,
-        },
-        tx,
-      );
-    }
-    return after;
+) {
+  return transition(request, "PROCESSING", backToPending, {
+    actor,
+    action: "approvals.fail",
+    outcome: "FAILURE",
+    reason: error,
   });
 }
 
-/** Treats requests stuck in PROCESSING past the timeout as failed. Returns how many. */
-export async function failStaleApprovals(
+/** A timed-out request can't be decided again until its outcome is known. */
+function markOutcomeUnknown(
+  request: ApprovalRequest,
+  reason: string,
+  actor: CurrentUser | null,
+) {
+  return transition(
+    request,
+    "PROCESSING",
+    { status: "OUTCOME_UNKNOWN", lastError: TIMEOUT_MESSAGE },
+    { actor, action: "approvals.outcome_unknown", outcome: "FAILURE", reason },
+  );
+}
+
+/** Asks the approval type whether a timed-out execution took effect. */
+async function settleOutcome(
+  request: ApprovalRequest,
+  registry: ApprovalRegistry,
+  integrations: Integrations,
+  now: () => Date,
+): Promise<ApprovalRequest | null> {
+  const type = registry.get(request.type);
+  if (!type) return null;
+  let outcome: Awaited<ReturnType<typeof type.checkOutcome>>;
+  try {
+    outcome = await type.checkOutcome(executionContext(request, integrations));
+  } catch {
+    return null;
+  }
+  if (outcome === "completed") {
+    return transition(
+      request,
+      "OUTCOME_UNKNOWN",
+      { status: "COMPLETED", completedAt: now(), lastError: null },
+      {
+        actor: null,
+        action: "approvals.complete",
+        reason: "Confirmed as completed after timing out",
+      },
+    );
+  }
+  if (outcome === "failed") {
+    return transition(request, "OUTCOME_UNKNOWN", backToPending, {
+      actor: null,
+      action: "approvals.fail",
+      outcome: "FAILURE",
+      reason: "Confirmed as not applied after timing out",
+    });
+  }
+  return null;
+}
+
+async function settleOne(
+  requestId: string,
+  registry: ApprovalRegistry,
+  integrations: Integrations,
+  now: () => Date,
+) {
+  const request = await db.approvalRequest.findUnique({
+    where: { id: requestId },
+  });
+  if (request?.status !== "OUTCOME_UNKNOWN") return request;
+  return (await settleOutcome(request, registry, integrations, now)) ?? request;
+}
+
+/**
+ * Marks requests stuck in PROCESSING past the timeout as OUTCOME_UNKNOWN, then
+ * completes or reopens every OUTCOME_UNKNOWN request whose outcome is now known.
+ */
+export async function settleApprovals(
   deps: ApprovalDeps = {},
-): Promise<number> {
-  const { now, processingTimeoutMs } = resolveDeps(deps);
+): Promise<{ timedOut: number; settled: number }> {
+  const { registry, integrations, now, processingTimeoutMs } =
+    resolveDeps(deps);
   const cutoff = new Date(now().getTime() - processingTimeoutMs);
   const stale = await db.approvalRequest.findMany({
     where: { status: "PROCESSING", processingStartedAt: { lt: cutoff } },
   });
   for (const request of stale) {
-    await markFailed(
-      request,
-      `Timed out after ${Math.round(processingTimeoutMs / 1000)}s in processing`,
-      null,
-    );
+    await markOutcomeUnknown(request, timeoutReason(processingTimeoutMs), null);
   }
-  return stale.length;
+
+  const unknown = await db.approvalRequest.findMany({
+    where: { status: "OUTCOME_UNKNOWN" },
+  });
+  let settled = 0;
+  for (const request of unknown) {
+    if (await settleOutcome(request, registry, integrations, now)) settled++;
+  }
+  return { timedOut: stale.length, settled };
+}
+
+class ProcessingTimeout extends Error {}
+
+function timeoutReason(ms: number) {
+  return `Timed out after ${Math.round(ms / 1000)}s in processing`;
 }
 
 async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
     timer = setTimeout(
-      () =>
-        reject(
-          new Error(`Timed out after ${Math.round(ms / 1000)}s in processing`),
-        ),
+      () => reject(new ProcessingTimeout(timeoutReason(ms))),
       ms,
     );
   });
@@ -450,6 +543,10 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   } finally {
     clearTimeout(timer);
   }
+}
+
+function lowerFirst(text: string) {
+  return text.charAt(0).toLowerCase() + text.slice(1);
 }
 
 function errorMessage(error: unknown): string {

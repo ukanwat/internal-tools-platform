@@ -24,6 +24,7 @@ enum AuditOutcome {
 enum ApprovalStatus {
   PENDING
   PROCESSING
+  OUTCOME_UNKNOWN
   COMPLETED
   REJECTED
 }

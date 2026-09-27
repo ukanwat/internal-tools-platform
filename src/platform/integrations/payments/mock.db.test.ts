@@ -25,6 +25,13 @@ describe("mock payments", () => {
     expect(await db.mockPayment.count()).toBe(1);
   });
 
+  it("finds a refund by idempotency key", async () => {
+    const payments = createMockPaymentsClient();
+    expect(await payments.findRefund("req_1")).toBeNull();
+    const { refundId } = await payments.refund(input);
+    expect(await payments.findRefund("req_1")).toEqual({ refundId });
+  });
+
   it("returns the original refund to concurrent calls with the same key", async () => {
     const payments = createMockPaymentsClient();
     const results = await Promise.all(

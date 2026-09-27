@@ -54,5 +54,11 @@ export function createMockPaymentsClient(): PaymentsClient {
         throw error;
       }
     },
+    async findRefund(idempotencyKey) {
+      const payment = await db.mockPayment.findUnique({
+        where: { idempotencyKey },
+      });
+      return payment ? { refundId: payment.id } : null;
+    },
   };
 }

@@ -23,7 +23,16 @@ export type ApprovalTypeDefinition<TPayload> = {
   entity?: (payload: TPayload) => ApprovalEntity;
   /** Runs after approval. Throw to put the request back to pending with the error. */
   execute: (ctx: ApprovalExecutionContext<TPayload>) => Promise<void>;
+  /**
+   * After `execute` timed out, reports whether it took effect, usually by
+   * looking up `idempotencyKey` in the integration. Return null if still unknown.
+   */
+  checkOutcome: (
+    ctx: ApprovalExecutionContext<TPayload>,
+  ) => Promise<ApprovalOutcome | null>;
 };
+
+export type ApprovalOutcome = "completed" | "failed";
 
 /** A definition with its payload type erased, as stored in the registry. */
 export type ApprovalType = {
@@ -37,6 +46,9 @@ export type ApprovalType = {
     entity: ApprovalEntity | undefined;
   };
   execute: (ctx: ApprovalExecutionContext<unknown>) => Promise<void>;
+  checkOutcome: (
+    ctx: ApprovalExecutionContext<unknown>,
+  ) => Promise<ApprovalOutcome | null>;
 };
 
 export function defineApprovalType<TPayload>(
@@ -57,6 +69,12 @@ export function defineApprovalType<TPayload>(
     },
     execute(ctx) {
       return definition.execute({
+        ...ctx,
+        payload: definition.parse(ctx.payload),
+      });
+    },
+    checkOutcome(ctx) {
+      return definition.checkOutcome({
         ...ctx,
         payload: definition.parse(ctx.payload),
       });

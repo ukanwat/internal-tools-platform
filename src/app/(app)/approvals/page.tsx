@@ -1,6 +1,6 @@
 import {
   approvalRegistry,
-  failStaleApprovals,
+  settleApprovals,
   listApprovals,
   parseApprovalTab,
 } from "@/platform/approvals";
@@ -22,7 +22,7 @@ export default async function ApprovalsPage({
   const tab = parseApprovalTab(params.tab);
   const requestedPage = Number(params.page);
 
-  await failStaleApprovals();
+  await settleApprovals();
   const { requests, counts, page, pageCount } = await listApprovals(
     user,
     tab,
@@ -44,7 +44,7 @@ export default async function ApprovalsPage({
           active: t === tab,
         }))}
       />
-      <ApprovalsList requests={requests} />
+      <ApprovalsList requests={requests} viewer={user} />
       <Pagination
         page={page}
         pageCount={pageCount}

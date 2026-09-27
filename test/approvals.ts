@@ -42,6 +42,11 @@ export const testRefundType = defineApprovalType<TestRefundPayload>({
   async execute({ payload, idempotencyKey, integrations }) {
     await integrations.payments.refund({ idempotencyKey, ...payload });
   },
+  async checkOutcome({ idempotencyKey, integrations }) {
+    return (await integrations.payments.findRefund(idempotencyKey))
+      ? "completed"
+      : "failed";
+  },
 });
 
 export const testRegistry = createApprovalRegistry([testRefundType]);

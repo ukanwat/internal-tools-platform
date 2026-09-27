@@ -13,8 +13,8 @@ import {
 import {
   approveApprovalRequest,
   createApprovalRequest,
-  failStaleApprovals,
   rejectApprovalRequest,
+  settleApprovals,
   type ApprovalDeps,
 } from "./service";
 
@@ -24,9 +24,15 @@ const support = seedUser("SUPPORT");
 const finance = seedUser("FINANCE_APPROVER");
 const lead = seedUser("COMPLIANCE_LEAD");
 
+const realPayments = createMockPaymentsClient();
 const deps: ApprovalDeps = {
   registry: testRegistry,
-  integrations: { payments: createMockPaymentsClient() },
+  integrations: { payments: realPayments },
+};
+/** A provider whose outcome lookups can't tell yet. */
+const stuckPayments: Integrations["payments"] = {
+  ...realPayments,
+  findRefund: () => Promise.reject(new Error("Provider unavailable")),
 };
 
 async function newRequest(paymentId = "pay_1", requester = support) {
@@ -157,6 +163,7 @@ describe("approveApprovalRequest", () => {
           statusDuringExecution = current.status;
           return { refundId: "r", replayed: false };
         },
+        findRefund: async () => null,
       },
     };
     await approveApprovalRequest(finance, request.id, "ok", {
@@ -247,14 +254,14 @@ describe("approveApprovalRequest", () => {
     );
     expect(result).toEqual({
       ok: false,
-      error: `Approved, but processing failed: Refund declined for ${MOCK_PAYMENT_IDS.decline}`,
+      error: "Approved, but processing failed. The request is back to pending.",
     });
     const after = await db.approvalRequest.findUniqueOrThrow({
       where: { id: request.id },
     });
     expect(after).toMatchObject({
       status: "PENDING",
-      lastError: `Refund declined for ${MOCK_PAYMENT_IDS.decline}`,
+      lastError: "Processing failed. The request is back to pending.",
       attempts: 1,
       processingStartedAt: null,
       decidedById: null,
@@ -266,7 +273,7 @@ describe("approveApprovalRequest", () => {
     ).toMatchObject({
       outcome: "FAILURE",
       actorId: finance.id,
-      reason: after.lastError,
+      reason: `Refund declined for ${MOCK_PAYMENT_IDS.decline}`,
     });
 
     const retry = await approveApprovalRequest(
@@ -285,19 +292,70 @@ describe("approveApprovalRequest", () => {
     ).toBe(2);
   });
 
-  it("treats execution that outlives the timeout as failed", async () => {
+  it("marks a timed-out request outcome unknown so it can't be decided again", async () => {
     const request = await newRequest(MOCK_PAYMENT_IDS.hang);
     const result = await approveApprovalRequest(finance, request.id, "ok", {
       ...deps,
       processingTimeoutMs: 50,
     });
-    expect(result.ok).toBe(false);
+    expect(result).toEqual({
+      ok: false,
+      error: expect.stringMatching(/^Approved, but processing timed out/),
+    });
     expect(
       await db.approvalRequest.findUniqueOrThrow({ where: { id: request.id } }),
+    ).toMatchObject({ status: "OUTCOME_UNKNOWN", decidedById: finance.id });
+    expect(
+      await db.auditLog.findFirst({
+        where: { entityId: request.id, action: "approvals.outcome_unknown" },
+      }),
     ).toMatchObject({
-      status: "PENDING",
-      lastError: expect.stringMatching(/Timed out/),
+      outcome: "FAILURE",
+      reason: expect.stringMatching(/Timed out/),
     });
+
+    expect(
+      await rejectApprovalRequest(lead, request.id, "no", {
+        ...deps,
+        integrations: { payments: stuckPayments },
+      }),
+    ).toMatchObject({ ok: false });
+    expect(
+      await approveApprovalRequest(lead, request.id, "again", {
+        ...deps,
+        integrations: { payments: stuckPayments },
+      }),
+    ).toMatchObject({ ok: false });
+  });
+
+  it("completes a timed-out request once its late execution finishes", async () => {
+    const request = await newRequest();
+    let finish = () => {};
+    const slowPayments: Integrations["payments"] = {
+      ...realPayments,
+      async refund(input) {
+        await new Promise<void>((resolve) => (finish = resolve));
+        return realPayments.refund(input);
+      },
+    };
+    const result = await approveApprovalRequest(finance, request.id, "ok", {
+      ...deps,
+      integrations: { payments: slowPayments },
+      processingTimeoutMs: 50,
+    });
+    expect(result.ok).toBe(false);
+    finish();
+    await expect
+      .poll(
+        async () =>
+          (
+            await db.approvalRequest.findUniqueOrThrow({
+              where: { id: request.id },
+            })
+          ).status,
+      )
+      .toBe("COMPLETED");
+    expect(await db.mockPayment.count()).toBe(1);
   });
 });
 
@@ -355,42 +413,86 @@ describe("rejectApprovalRequest", () => {
   });
 });
 
-describe("failStaleApprovals", () => {
-  it("returns requests stuck in processing past the timeout to pending and logs it", async () => {
+describe("settleApprovals", () => {
+  it("marks requests stuck in processing past the timeout outcome unknown", async () => {
     const stale = await newRequest("pay_stale");
     const fresh = await newRequest("pay_fresh");
     const now = new Date();
-    await db.approvalRequest.update({
-      where: { id: stale.id },
-      data: {
-        status: "PROCESSING",
-        processingStartedAt: new Date(now.getTime() - 6 * 60_000),
-      },
-    });
-    await db.approvalRequest.update({
-      where: { id: fresh.id },
-      data: {
-        status: "PROCESSING",
-        processingStartedAt: new Date(now.getTime() - 60_000),
-      },
+    for (const [id, ageMs] of [
+      [stale.id, 6 * 60_000],
+      [fresh.id, 60_000],
+    ] as const) {
+      await db.approvalRequest.update({
+        where: { id },
+        data: {
+          status: "PROCESSING",
+          decidedById: finance.id,
+          processingStartedAt: new Date(now.getTime() - ageMs),
+        },
+      });
+    }
+
+    const result = await settleApprovals({
+      ...deps,
+      integrations: { payments: stuckPayments },
+      now: () => now,
     });
 
-    expect(await failStaleApprovals({ ...deps, now: () => now })).toBe(1);
-
+    expect(result).toEqual({ timedOut: 1, settled: 0 });
     expect(
-      await db.approvalRequest.findUniqueOrThrow({ where: { id: stale.id } }),
-    ).toMatchObject({
-      status: "PENDING",
-      lastError: "Timed out after 300s in processing",
-    });
+      (await db.approvalRequest.findUniqueOrThrow({ where: { id: stale.id } }))
+        .status,
+    ).toBe("OUTCOME_UNKNOWN");
     expect(
       (await db.approvalRequest.findUniqueOrThrow({ where: { id: fresh.id } }))
         .status,
     ).toBe("PROCESSING");
     expect(
       await db.auditLog.findFirst({
-        where: { entityId: stale.id, action: "approvals.fail" },
+        where: { entityId: stale.id, action: "approvals.outcome_unknown" },
       }),
-    ).toMatchObject({ outcome: "FAILURE", actorId: null });
+    ).toMatchObject({
+      outcome: "FAILURE",
+      actorId: null,
+      reason: "Timed out after 300s in processing",
+    });
+  });
+
+  it("completes unknown requests whose refund went through and reopens the rest", async () => {
+    const paid = await newRequest("pay_paid");
+    const unpaid = await newRequest("pay_unpaid");
+    for (const { id } of [paid, unpaid]) {
+      await db.approvalRequest.update({
+        where: { id },
+        data: { status: "OUTCOME_UNKNOWN", decidedById: finance.id },
+      });
+    }
+    await realPayments.refund({
+      idempotencyKey: paid.id,
+      paymentId: "pay_paid",
+      amountMinor: 1200,
+      currency: "USD",
+    });
+
+    expect(await settleApprovals(deps)).toEqual({ timedOut: 0, settled: 2 });
+
+    expect(
+      await db.approvalRequest.findUniqueOrThrow({ where: { id: paid.id } }),
+    ).toMatchObject({ status: "COMPLETED", lastError: null });
+    expect(
+      await db.approvalRequest.findUniqueOrThrow({ where: { id: unpaid.id } }),
+    ).toMatchObject({
+      status: "PENDING",
+      decidedById: null,
+      lastError: "Processing failed. The request is back to pending.",
+    });
+    expect(
+      await db.auditLog.findFirst({
+        where: { entityId: unpaid.id, action: "approvals.fail" },
+      }),
+    ).toMatchObject({
+      outcome: "FAILURE",
+      reason: "Confirmed as not applied after timing out",
+    });
   });
 });

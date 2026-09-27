@@ -14,6 +14,8 @@ export type RefundResult = {
 
 export interface PaymentsClient {
   refund(input: RefundInput): Promise<RefundResult>;
+  /** The refund made with this idempotency key, or null if none went through. */
+  findRefund(idempotencyKey: string): Promise<{ refundId: string } | null>;
 }
 
 export class PaymentsError extends Error {
