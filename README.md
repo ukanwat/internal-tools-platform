@@ -44,8 +44,9 @@ The app runs at http://localhost:3000. Sign in with the "sign in as" picker; `db
   - `audit` — `recordAudit()` and the audit log queries/components
   - `approvals` — second-person sign-off: request, approve/reject with a reason, `/approvals` page
   - `integrations` — the only way to reach outside systems (`payments` is a mock for now)
+  - `attachments` — files on a tool's records: stored write-once, downloads checked against the tool's policy, every upload and download audited
   - `sensitive` — masked fields (account/ID numbers) and audited, reason-required reveals
-  - `ui` — shared page header, data table, filter bar, status badges, record history
+  - `ui` — shared page header, data table, filter bar, status badges, record history, attachments
   - `config.ts` — platform settings read from the environment
   - `db` — shared Prisma Client instance
 - `prisma/schema.prisma` — database schema; `prisma.config.ts` — Prisma CLI config
@@ -146,6 +147,40 @@ logged as `DENIED`.
 To support reveals, a tool registers a loader for its record type in `sensitiveSources`
 (`src/platform/sensitive/sources.ts`). The loader receives the current user and returns null for records that user may not open. `recordAudit` masks every property named in
 `SENSITIVE_FIELDS`, at any depth, so the audit log never stores these values in the clear.
+
+## Attachments
+
+A tool that accepts files registers a policy for its record type in `attachmentPolicies`
+(`src/platform/attachments/policies.ts`). The tool decides who may see and add files; the
+platform enforces it:
+
+```ts
+{
+  entityType: "KycCase",
+  viewPermission: "kyc.view", // role check, denial logged by authorize()
+  uploadPermission: "kyc.review",
+  canView: (caseId, actor) => canOpenCase(caseId, actor), // record-level check
+  canUpload: (caseId, actor) => isOpen(caseId),
+  allowedTypes: ["application/pdf", "image/jpeg"], // default: PDF, PNG, JPEG
+  maxBytes: 5 * 1024 * 1024, // default and maximum: 10 MB
+}
+```
+
+Pages render `<Attachments viewer={user} entity={{ type: "KycCase", id }} />` from
+`src/platform/ui/attachments.tsx`: it lists the record's files for viewers the policy allows and
+shows the upload form to users who may upload. Downloads go through `/api/attachments/<id>`, which
+checks the role permission and then `canView` before serving the file.
+
+- The file type comes from the file's contents, not its name or the browser's claim. Names are
+  sanitized, and files are always served as downloads (`Content-Disposition: attachment`, `nosniff`).
+- Every upload writes an `attachments.upload` entry (in the same transaction as the file row) and
+  every download writes an `attachments.download` entry before the bytes are sent, both on the
+  record so they appear in its history. Role and policy denials are logged as `DENIED`.
+- Files can't be deleted or replaced. The platform has no delete API, storage is write-once, and a
+  database trigger rejects `UPDATE` and `DELETE` on `attachments`. Downloads check the stored
+  SHA-256 and refuse files that don't match.
+- Files are stored on local disk under `ATTACHMENTS_STORAGE_DIR` (default `.data/attachments`).
+  To use object storage instead, change `getFileStorage()` in `src/platform/integrations/storage`.
 
 ## Tests
 

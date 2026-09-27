@@ -32,6 +32,8 @@ const ACTIONS: Record<string, string> = {
   "sensitive.reveal": "Revealed sensitive data",
   "flags.change": "Changed a feature flag",
   "flags.turn_off": "Turned off a feature flag",
+  "attachments.upload": "Uploaded a file",
+  "attachments.download": "Downloaded a file",
 };
 
 /** Actions hidden from the audit log unless asked for. */
@@ -84,6 +86,26 @@ const REASONS: [RegExp, (...groups: string[]) => string][] = [
     /^Not signed in; ([\w.]+) requires a session$/,
     (permission) =>
       `Someone who wasn't signed in tried to ${lowerFirst(describeAction(permission))}.`,
+  ],
+  [
+    /^Not signed in; downloads require a session$/,
+    () => "Someone who wasn't signed in tried to download a file.",
+  ],
+  [
+    /^\w+ policy does not allow uploads on this record$/,
+    () => "This person isn't allowed to add files to this record.",
+  ],
+  [
+    /^\w+ policy does not allow viewing this record's files$/,
+    () => "This person isn't allowed to see this record's files.",
+  ],
+  [
+    /^Stored file does not match its checksum$/,
+    () => "The stored file changed after upload, so it wasn't served.",
+  ],
+  [
+    /^Stored file is missing$/,
+    () => "The stored file is missing, so it couldn't be served.",
   ],
   [
     /^Cannot decide your own request$/,

@@ -17,3 +17,8 @@ export function approvalProcessingTimeoutMs(): number {
     DEFAULT_APPROVAL_PROCESSING_TIMEOUT_MS,
   );
 }
+
+/** Where uploaded attachments are stored on local disk. */
+export function attachmentsStorageDir(): string {
+  return process.env.ATTACHMENTS_STORAGE_DIR || ".data/attachments";
+}
