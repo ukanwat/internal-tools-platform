@@ -1,3 +1,5 @@
+import type { Prisma } from "@/generated/prisma/client";
+import type { CurrentUser } from "@/platform/auth/types";
 import type { Integrations } from "@/platform/integrations";
 import type { Permission } from "@/platform/permissions/policy";
 
@@ -11,6 +13,13 @@ export type ApprovalExecutionContext<TPayload> = {
   integrations: Integrations;
 };
 
+export type ApprovalRequestCheckContext<TPayload> = {
+  /** The transaction that will create the request; lock rows with it. */
+  tx: Prisma.TransactionClient;
+  payload: TPayload;
+  actor: CurrentUser;
+};
+
 export type ApprovalTypeDefinition<TPayload> = {
   /** Unique key, e.g. `refunds.issue`. */
   key: string;
@@ -21,6 +30,14 @@ export type ApprovalTypeDefinition<TPayload> = {
   parse: (input: unknown) => TPayload;
   describe: (payload: TPayload) => string;
   entity?: (payload: TPayload) => ApprovalEntity;
+  /**
+   * Runs inside the transaction that creates the request, so it can check the
+   * record's current state (e.g. still open, no other request in flight).
+   * Return a user-facing message to refuse the request.
+   */
+  checkRequest?: (
+    ctx: ApprovalRequestCheckContext<TPayload>,
+  ) => Promise<string | null>;
   /** Runs after approval. Throw to put the request back to pending with the error. */
   execute: (ctx: ApprovalExecutionContext<TPayload>) => Promise<void>;
   /**
@@ -45,6 +62,9 @@ export type ApprovalType = {
     summary: string;
     entity: ApprovalEntity | undefined;
   };
+  checkRequest: (
+    ctx: ApprovalRequestCheckContext<unknown>,
+  ) => Promise<string | null>;
   execute: (ctx: ApprovalExecutionContext<unknown>) => Promise<void>;
   checkOutcome: (
     ctx: ApprovalExecutionContext<unknown>,
@@ -66,6 +86,13 @@ export function defineApprovalType<TPayload>(
         summary: definition.describe(payload),
         entity: definition.entity?.(payload),
       };
+    },
+    async checkRequest(ctx) {
+      if (!definition.checkRequest) return null;
+      return definition.checkRequest({
+        ...ctx,
+        payload: definition.parse(ctx.payload),
+      });
     },
     execute(ctx) {
       return definition.execute({

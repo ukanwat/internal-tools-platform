@@ -5,6 +5,7 @@ import { seedUser, setupTestDatabase } from "../../../test/db";
 
 import { db } from "@/platform/db";
 import type { Integrations } from "@/platform/integrations";
+import { createMockKycClient } from "@/platform/integrations/kyc/mock";
 import {
   createMockPaymentsClient,
   MOCK_PAYMENT_IDS,
@@ -27,7 +28,7 @@ const lead = seedUser("COMPLIANCE_LEAD");
 const realPayments = createMockPaymentsClient();
 const deps: ApprovalDeps = {
   registry: testRegistry,
-  integrations: { payments: realPayments },
+  integrations: { kyc: createMockKycClient(), payments: realPayments },
 };
 /** A provider whose outcome lookups can't tell yet. */
 const stuckPayments: Integrations["payments"] = {
@@ -155,6 +156,7 @@ describe("approveApprovalRequest", () => {
     const request = await newRequest();
     let statusDuringExecution: string | undefined;
     const spying: Integrations = {
+      kyc: createMockKycClient(),
       payments: {
         async refund() {
           const current = await db.approvalRequest.findUniqueOrThrow({
@@ -302,7 +304,7 @@ describe("approveApprovalRequest", () => {
     };
     const result = await approveApprovalRequest(finance, request.id, "ok", {
       ...deps,
-      integrations: { payments: throwing },
+      integrations: { kyc: createMockKycClient(), payments: throwing },
     });
     expect(result).toMatchObject({ ok: false });
     expect(
@@ -340,13 +342,13 @@ describe("approveApprovalRequest", () => {
     expect(
       await rejectApprovalRequest(lead, request.id, "no", {
         ...deps,
-        integrations: { payments: stuckPayments },
+        integrations: { kyc: createMockKycClient(), payments: stuckPayments },
       }),
     ).toMatchObject({ ok: false });
     expect(
       await approveApprovalRequest(lead, request.id, "again", {
         ...deps,
-        integrations: { payments: stuckPayments },
+        integrations: { kyc: createMockKycClient(), payments: stuckPayments },
       }),
     ).toMatchObject({ ok: false });
   });
@@ -363,7 +365,7 @@ describe("approveApprovalRequest", () => {
     };
     const result = await approveApprovalRequest(finance, request.id, "ok", {
       ...deps,
-      integrations: { payments: slowPayments },
+      integrations: { kyc: createMockKycClient(), payments: slowPayments },
       processingTimeoutMs: 50,
     });
     expect(result.ok).toBe(false);
@@ -457,7 +459,7 @@ describe("settleApprovals", () => {
 
     const result = await settleApprovals({
       ...deps,
-      integrations: { payments: stuckPayments },
+      integrations: { kyc: createMockKycClient(), payments: stuckPayments },
       now: () => now,
     });
 

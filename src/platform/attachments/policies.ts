@@ -1,5 +1,6 @@
 import type { CurrentUser } from "@/platform/auth/types";
 import type { Permission } from "@/platform/permissions/policy";
+import { kycCaseAttachmentPolicy } from "@/tools/kyc/attachment-policy";
 
 import {
   DEFAULT_ALLOWED_TYPES,
@@ -51,4 +52,6 @@ export function createAttachmentPolicyRegistry(
 }
 
 /** Tools add a policy for each record type that accepts files. */
-export const attachmentPolicies = createAttachmentPolicyRegistry([]);
+export const attachmentPolicies = createAttachmentPolicyRegistry([
+  kycCaseAttachmentPolicy,
+]);

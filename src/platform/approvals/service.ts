@@ -87,32 +87,49 @@ export async function createApprovalRequest(
     return { ok: false, error: `Invalid request: ${errorMessage(error)}` };
   }
 
-  const request = await db.$transaction(async (tx) => {
-    const created = await tx.approvalRequest.create({
-      data: {
-        type: type.key,
-        payload: JSON.parse(JSON.stringify(prepared.payload)),
-        summary: prepared.summary,
-        entityType: prepared.entity?.type,
-        entityId: prepared.entity?.id,
-        requestedById: actor.id,
-        requestReason: reason,
-      },
-    });
-    await recordAudit(
-      {
+  let request: ApprovalRequest;
+  try {
+    request = await db.$transaction(async (tx) => {
+      const refusal = await type.checkRequest({
+        tx,
+        payload: prepared.payload,
         actor,
-        action: "approvals.request",
-        entity: auditEntity(created.id),
-        after: snapshot(created),
-        reason,
-      },
-      tx,
-    );
-    return created;
-  });
+      });
+      if (refusal) throw new RequestRefused(refusal);
+      const created = await tx.approvalRequest.create({
+        data: {
+          type: type.key,
+          payload: JSON.parse(JSON.stringify(prepared.payload)),
+          summary: prepared.summary,
+          entityType: prepared.entity?.type,
+          entityId: prepared.entity?.id,
+          requestedById: actor.id,
+          requestReason: reason,
+        },
+      });
+      await recordAudit(
+        {
+          actor,
+          action: "approvals.request",
+          entity: auditEntity(created.id),
+          after: snapshot(created),
+          reason,
+        },
+        tx,
+      );
+      return created;
+    });
+  } catch (error) {
+    if (error instanceof RequestRefused) {
+      return { ok: false, error: error.message };
+    }
+    throw error;
+  }
   return { ok: true, request };
 }
+
+/** Thrown inside the create transaction to roll it back when a type refuses the request. */
+class RequestRefused extends Error {}
 
 /** Loads a request's type so callers can check its decide permission first. */
 export async function getApprovalDecidePermission(

@@ -25,7 +25,8 @@ describe("describeAction", () => {
 describe("describeEntityType", () => {
   it("splits unknown types into words", () => {
     expect(describeEntityType("ApprovalRequest")).toBe("Approval request");
-    expect(describeEntityType("KycCase")).toBe("Kyc Case");
+    expect(describeEntityType("KycCase")).toBe("KYC case");
+    expect(describeEntityType("SanctionsHit")).toBe("Sanctions Hit");
   });
 });
 

@@ -27,6 +27,8 @@ const ACTIONS: Record<string, string> = {
   "sensitive.reveal": "Revealed sensitive data",
   "attachments.upload": "Uploaded a file",
   "attachments.download": "Downloaded a file",
+  "kyc.approve": "Approved a KYC case",
+  "kyc.reject": "Rejected a KYC case",
 };
 
 /** Actions hidden from the audit log unless asked for. */
@@ -40,6 +42,7 @@ export function describeAction(action: string): string {
 
 const ENTITY_TYPES: Record<string, string> = {
   ApprovalRequest: "Approval request",
+  KycCase: "KYC case",
   User: "Person",
 };
 

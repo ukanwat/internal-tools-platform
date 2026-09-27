@@ -16,7 +16,7 @@ export type Permission = (typeof PERMISSIONS)[number];
 
 /** The single source of truth for what each role may do. */
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
-  SUPPORT: ["refunds.view", "refunds.request", "kyc.view"],
+  SUPPORT: ["refunds.view", "refunds.request"],
   FINANCE_APPROVER: [
     "refunds.view",
     "refunds.approve",
