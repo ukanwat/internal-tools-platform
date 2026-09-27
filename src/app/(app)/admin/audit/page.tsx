@@ -31,6 +31,7 @@ export default async function AuditLogPage({
         </p>
       </div>
       <AuditFilters
+        key={auditFiltersToQuery({ ...filters, page: 1 })}
         basePath={BASE_PATH}
         actors={options.actors}
         actions={options.actions}
