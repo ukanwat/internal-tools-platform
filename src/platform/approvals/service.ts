@@ -94,6 +94,12 @@ export async function createApprovalRequest(
   }
 
   const write = async (client: Prisma.TransactionClient) => {
+    const refusal = await type.checkRequest({
+      tx: client,
+      payload: prepared.payload,
+      actor,
+    });
+    if (refusal) throw new RequestRefused(refusal);
     const created = await client.approvalRequest.create({
       data: {
         type: type.key,
@@ -117,9 +123,27 @@ export async function createApprovalRequest(
     );
     return created;
   };
-  const request = tx ? await write(tx) : await db.$transaction(write);
+  let request: ApprovalRequest;
+  try {
+    request = tx ? await write(tx) : await db.$transaction(write);
+  } catch (error) {
+    if (error instanceof RequestRefused) {
+      await recordAudit({
+        actor,
+        action: "approvals.request",
+        outcome: "DENIED",
+        entity: prepared.entity,
+        reason: error.message,
+      });
+      return { ok: false, error: error.message };
+    }
+    throw error;
+  }
   return { ok: true, request };
 }
+
+/** Thrown inside the create transaction to roll it back when a type refuses the request. */
+class RequestRefused extends Error {}
 
 /** Loads a request's type so callers can check its decide permission first. */
 export async function getApprovalDecidePermission(

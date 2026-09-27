@@ -169,7 +169,7 @@ describe("downloadAttachment", () => {
   it("returns the bytes and logs who downloaded which file", async () => {
     const deps = setup();
     const attachment = await uploadOk(deps);
-    expect(await downloadAttachment(support, attachment.id, deps)).toEqual({
+    expect(await downloadAttachment(lead, attachment.id, deps)).toEqual({
       ok: true,
       filename: "passport.pdf",
       contentType: "application/pdf",
@@ -177,7 +177,7 @@ describe("downloadAttachment", () => {
     });
     const [entry] = await auditFor("attachments.download");
     expect(entry).toMatchObject({
-      actorId: support.id,
+      actorId: lead.id,
       outcome: "SUCCESS",
       entityType: "KycCase",
       entityId: "kyc_1",
@@ -266,10 +266,14 @@ describe("listAttachments", () => {
     await uploadOk(deps);
     await uploadOk(deps, leadOnly);
 
-    expect(await listAttachments(support, kyc, deps)).toMatchObject({
+    expect(await listAttachments(lead, kyc, deps)).toMatchObject({
       canView: true,
-      canUpload: false,
       attachments: [{ filename: "passport.pdf" }],
+    });
+    expect(await listAttachments(support, kyc, deps)).toMatchObject({
+      canView: false,
+      canUpload: false,
+      attachments: [],
     });
     expect(await listAttachments(reviewer, leadOnly, deps)).toMatchObject({
       canView: false,

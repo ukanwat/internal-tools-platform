@@ -40,6 +40,7 @@ export const TOOLS: ToolDefinition[] = [
     name: "KYC review",
     description: "Review identity checks and record compliance decisions.",
     icon: "kyc",
+    href: "/kyc",
     permission: "kyc.view",
   },
   {

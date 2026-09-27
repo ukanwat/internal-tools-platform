@@ -9,6 +9,7 @@ import {
 } from "@/platform/approvals/service";
 import { createApprovalRegistry } from "@/platform/approvals/registry";
 import { db } from "@/platform/db";
+import { createMockKycClient } from "@/platform/integrations/kyc/mock";
 import {
   createMockPaymentsClient,
   MOCK_PAYMENT_IDS,
@@ -31,9 +32,10 @@ const finance = seedUser("FINANCE_APPROVER");
 const reviewer = seedUser("COMPLIANCE_REVIEWER");
 
 const payments = createMockPaymentsClient();
-const approvalDeps: ApprovalDeps = { integrations: { payments } };
+const kyc = createMockKycClient();
+const approvalDeps: ApprovalDeps = { integrations: { kyc, payments } };
 const deps: RefundDeps = {
-  integrations: { payments },
+  integrations: { kyc, payments },
   approvalThresholdMinor: 50_000,
   approvals: approvalDeps,
 };

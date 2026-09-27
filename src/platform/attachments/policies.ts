@@ -1,5 +1,7 @@
+import type { Prisma } from "@/generated/prisma/client";
 import type { CurrentUser } from "@/platform/auth/types";
 import type { Permission } from "@/platform/permissions/policy";
+import { kycCaseAttachmentPolicy } from "@/tools/kyc/attachment-policy";
 
 import {
   DEFAULT_ALLOWED_TYPES,
@@ -19,8 +21,16 @@ export type AttachmentPolicy = {
   uploadPermission: Permission;
   /** Whether `actor` may see this record's files. */
   canView: (entityId: string, actor: CurrentUser) => Promise<boolean>;
-  /** Whether `actor` may add files to this record (e.g. not once it is closed). */
-  canUpload: (entityId: string, actor: CurrentUser) => Promise<boolean>;
+  /**
+   * Whether `actor` may add files to this record (e.g. not once it is closed).
+   * Asked again with `tx` in the transaction that inserts the file; lock the
+   * record there if its state can change concurrently.
+   */
+  canUpload: (
+    entityId: string,
+    actor: CurrentUser,
+    tx?: Prisma.TransactionClient,
+  ) => Promise<boolean>;
   /** Defaults to PDF, PNG and JPEG. */
   allowedTypes?: readonly AttachmentContentType[];
   /** Defaults to, and is capped at, 10 MB. */
@@ -51,4 +61,6 @@ export function createAttachmentPolicyRegistry(
 }
 
 /** Tools add a policy for each record type that accepts files. */
-export const attachmentPolicies = createAttachmentPolicyRegistry([]);
+export const attachmentPolicies = createAttachmentPolicyRegistry([
+  kycCaseAttachmentPolicy,
+]);

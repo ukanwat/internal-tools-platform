@@ -37,3 +37,36 @@ export function refundApprovalThresholdMinor(): number {
 export function attachmentsStorageDir(): string {
   return process.env.ATTACHMENTS_STORAGE_DIR || ".data/attachments";
 }
+
+const DEFAULT_KYC_VENDOR_DASHBOARD_URL = "https://kyc-vendor.example.com";
+
+/** Base URL of the KYC vendor's dashboard, where reviewers open ID documents. */
+export function kycVendorDashboardUrl(): string {
+  const value = process.env.KYC_VENDOR_DASHBOARD_URL;
+  if (!value) return DEFAULT_KYC_VENDOR_DASHBOARD_URL;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:") return DEFAULT_KYC_VENDOR_DASHBOARD_URL;
+    return url.toString().replace(/\/+$/, "");
+  } catch {
+    return DEFAULT_KYC_VENDOR_DASHBOARD_URL;
+  }
+}
+
+const KYC_RISK_LEVELS = ["LOW", "MEDIUM", "HIGH"] as const;
+const DEFAULT_KYC_LEAD_APPROVAL_RISK_LEVELS = ["HIGH"] as const;
+
+/**
+ * Risk levels whose KYC decisions need a compliance lead's sign-off. A
+ * comma-separated list; HIGH always needs sign-off, whatever the setting.
+ */
+export function kycLeadApprovalRiskLevels(): readonly (typeof KYC_RISK_LEVELS)[number][] {
+  const configured = (process.env.KYC_LEAD_APPROVAL_RISK_LEVELS ?? "")
+    .split(",")
+    .map((level) => level.trim().toUpperCase());
+  return KYC_RISK_LEVELS.filter(
+    (level) =>
+      DEFAULT_KYC_LEAD_APPROVAL_RISK_LEVELS.some((d) => d === level) ||
+      configured.includes(level),
+  );
+}

@@ -32,4 +32,24 @@ describe("role policy", () => {
     );
     expect(withAudit.sort()).toEqual(["ADMIN", "COMPLIANCE_LEAD"]);
   });
+
+  it("keeps KYC away from everyone but compliance", () => {
+    for (const permission of [
+      "kyc.view",
+      "kyc.review",
+      "pii.reveal_id_number",
+    ] as const) {
+      const roles = Object.values(Role).filter((r) =>
+        hasPermission(r, permission),
+      );
+      expect(roles.sort()).toEqual(["COMPLIANCE_LEAD", "COMPLIANCE_REVIEWER"]);
+    }
+  });
+
+  it("only lets the compliance lead sign off KYC decisions", () => {
+    const deciders = Object.values(Role).filter((r) =>
+      hasPermission(r, "kyc.decide"),
+    );
+    expect(deciders).toEqual(["COMPLIANCE_LEAD"]);
+  });
 });

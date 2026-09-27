@@ -37,6 +37,8 @@ const ACTIONS: Record<string, string> = {
   "refunds.payment_failed": "Refund payment failed",
   "attachments.upload": "Uploaded a file",
   "attachments.download": "Downloaded a file",
+  "kyc.approve": "Approved a KYC case",
+  "kyc.reject": "Rejected a KYC case",
 };
 
 /** Actions hidden from the audit log unless asked for. */
@@ -50,6 +52,7 @@ export function describeAction(action: string): string {
 
 const ENTITY_TYPES: Record<string, string> = {
   ApprovalRequest: "Approval request",
+  KycCase: "KYC case",
   User: "Person",
   FeatureFlagState: "Feature flag",
 };

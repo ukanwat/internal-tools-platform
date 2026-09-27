@@ -117,7 +117,7 @@ export async function uploadAttachment(
 
   const auth = await authorize(actor, policy.uploadPermission, entity);
   if (!auth.ok) return { ok: false, error: "You cannot upload files here" };
-  if (!(await policy.canUpload(entity.id, actor))) {
+  const policyDenied = async () => {
     await recordAudit({
       actor,
       action: "attachments.upload",
@@ -125,8 +125,9 @@ export async function uploadAttachment(
       entity,
       reason: `${entity.type} policy does not allow uploads on this record`,
     });
-    return { ok: false, error: "You cannot upload files here" };
-  }
+    return { ok: false, error: "You cannot upload files here" } as const;
+  };
+  if (!(await policy.canUpload(entity.id, actor))) return policyDenied();
 
   if (file.bytes.byteLength === 0)
     return { ok: false, error: "The file is empty" };
@@ -156,6 +157,7 @@ export async function uploadAttachment(
     uploadedById: actor.id,
   };
   const row = await db.$transaction(async (tx) => {
+    if (!(await policy.canUpload(entity.id, actor, tx))) return null;
     const created = await tx.attachment.create({
       data,
       include: { uploadedBy: { select: { name: true } } },
@@ -171,6 +173,7 @@ export async function uploadAttachment(
     );
     return created;
   });
+  if (!row) return policyDenied();
   return { ok: true, attachment: toView(row) };
 }
 

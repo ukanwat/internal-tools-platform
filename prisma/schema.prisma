@@ -43,6 +43,8 @@ model User {
   flagChanges  FeatureFlagState[]
   refunds      Refund[]
   attachments  Attachment[]
+  kycReviewed  KycCase[]         @relation("kycReviewedBy")
+  kycDecided   KycCase[]         @relation("kycDecidedBy")
 
   @@map("users")
 }
@@ -236,4 +238,41 @@ model Attachment {
 
   @@index([entityType, entityId, createdAt])
   @@map("attachments")
+}
+
+enum KycRiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum KycCaseStatus {
+  OPEN
+  APPROVED
+  REJECTED
+}
+
+/// A customer's identity check awaiting a compliance decision. Check results,
+/// ID numbers and documents stay with the KYC vendor; only the reference is kept.
+model KycCase {
+  id                String        @id @default(cuid())
+  customerName      String        @map("customer_name")
+  customerEmail     String        @map("customer_email")
+  country           String
+  riskLevel         KycRiskLevel  @map("risk_level")
+  status            KycCaseStatus @default(OPEN)
+  vendorCheckId     String        @unique @map("vendor_check_id")
+  reviewedById      String?       @map("reviewed_by_id")
+  reviewedBy        User?         @relation("kycReviewedBy", fields: [reviewedById], references: [id], onDelete: Restrict)
+  decidedById       String?       @map("decided_by_id")
+  decidedBy         User?         @relation("kycDecidedBy", fields: [decidedById], references: [id], onDelete: Restrict)
+  decisionReason    String?       @map("decision_reason")
+  decidedAt         DateTime?     @map("decided_at")
+  /// Set when the decision was signed off through an approval request.
+  approvalRequestId String?       @unique @map("approval_request_id")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+
+  @@index([status, riskLevel, createdAt])
+  @@map("kyc_cases")
 }

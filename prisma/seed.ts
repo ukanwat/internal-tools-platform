@@ -5,6 +5,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 import type { FlagEnvironment } from "../src/generated/prisma/enums";
 import { SEED_USERS } from "../src/platform/auth/seed-users";
+import { SEED_KYC_CASES } from "../src/tools/kyc/seed-cases";
 
 import { seedRefunds } from "./seed-refunds";
 
@@ -79,6 +80,16 @@ async function main() {
   }
   console.log(`Seeded ${SEED_FLAGS.length} feature flags`);
   await seedRefunds(db);
+
+  for (const kycCase of SEED_KYC_CASES) {
+    const { id, ...details } = kycCase;
+    await db.kycCase.upsert({
+      where: { id },
+      update: details,
+      create: kycCase,
+    });
+  }
+  console.log(`Seeded ${SEED_KYC_CASES.length} KYC cases`);
 }
 
 main()
