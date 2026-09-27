@@ -26,7 +26,9 @@ describe("AuditLogTable", () => {
     expect(screen.getByText("rf_1")).toBeInTheDocument();
     expect(screen.getByText("Refund")).toBeInTheDocument();
     expect(screen.getByText("Denied")).toBeInTheDocument();
-    expect(screen.getByText(base.reason!)).toBeInTheDocument();
+    expect(
+      screen.getByText("Support users aren't allowed to approve a refund."),
+    ).toBeInTheDocument();
   });
 
   it("shows anonymous actors and before/after values", () => {

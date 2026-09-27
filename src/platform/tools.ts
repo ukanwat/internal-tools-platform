@@ -4,6 +4,8 @@ export type ToolIcon = "approvals" | "audit" | "refunds" | "kyc";
 
 export type ToolDefinition = {
   key: string;
+  /** Tools are the ops workflows; platform pages (approvals, audit) serve every tool. */
+  kind: "tool" | "platform";
   name: string;
   description: string;
   icon: ToolIcon;
@@ -17,6 +19,7 @@ export type ToolDefinition = {
 export const TOOLS: ToolDefinition[] = [
   {
     key: "approvals",
+    kind: "platform",
     name: "Approvals",
     description: "Review requests that need a second person to sign off.",
     icon: "approvals",
@@ -24,6 +27,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     key: "refunds",
+    kind: "tool",
     name: "Refunds",
     description: "Look up payments and request refunds for customers.",
     icon: "refunds",
@@ -31,6 +35,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     key: "kyc",
+    kind: "tool",
     name: "KYC review",
     description: "Review identity checks and record compliance decisions.",
     icon: "kyc",
@@ -38,6 +43,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     key: "audit",
+    kind: "platform",
     name: "Audit log",
     description: "See who did what, when and why across every tool.",
     icon: "audit",

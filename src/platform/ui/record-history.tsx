@@ -3,7 +3,7 @@ import "server-only";
 import type { CurrentUser } from "@/platform/auth/types";
 import { db } from "@/platform/db";
 import { hasPermission } from "@/platform/permissions/policy";
-import { describeAction } from "@/platform/audit/labels";
+import { describeAction, describeReason } from "@/platform/audit/labels";
 import { ROLE_LABELS } from "@/platform/permissions/roles";
 
 import { LocalTime } from "./local-time";
@@ -74,7 +74,7 @@ export async function RecordHistory(props: Props) {
           </div>
           {entry.reason && (
             <p className="text-muted-foreground whitespace-pre-wrap">
-              {entry.reason}
+              {describeReason(entry.reason)}
             </p>
           )}
         </li>

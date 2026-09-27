@@ -38,13 +38,14 @@ import type { ToolIcon } from "@/platform/tools";
 import { TOOL_ICONS } from "./tool-icons";
 
 export type NavItem = {
-  href: string;
+  /** Items without a link are shown as coming soon. */
+  href?: string;
   label: string;
   icon: ToolIcon | "home";
   badge?: number;
 };
 
-export type NavSection = { label: string; items: NavItem[] };
+export type NavSection = { label?: string; items: NavItem[] };
 
 type Props = {
   sections: NavSection[];
@@ -53,7 +54,8 @@ type Props = {
   children: ReactNode;
 };
 
-function isActive(pathname: string, href: string) {
+function isActive(pathname: string, href: string | undefined) {
+  if (!href) return false;
   return href === "/"
     ? pathname === "/"
     : pathname === href || pathname.startsWith(`${href}/`);
@@ -88,7 +90,7 @@ export function AppShell({ sections, user, signOut, children }: Props) {
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">Ops Console</span>
                   <span className="text-muted-foreground truncate text-xs">
-                    Payments operations
+                    Internal tools
                   </span>
                 </div>
               </SidebarMenuButton>
@@ -97,13 +99,15 @@ export function AppShell({ sections, user, signOut, children }: Props) {
         </SidebarHeader>
         <SidebarContent>
           {sections.map((section) => (
-            <SidebarGroup key={section.label}>
-              <SidebarGroupLabel>{section.label}</SidebarGroupLabel>
+            <SidebarGroup key={section.label ?? "main"}>
+              {section.label && (
+                <SidebarGroupLabel>{section.label}</SidebarGroupLabel>
+              )}
               <SidebarGroupContent>
                 <SidebarMenu>
                   {section.items.map((item) => (
                     <NavLink
-                      key={item.href}
+                      key={item.label}
                       item={item}
                       active={isActive(pathname, item.href)}
                     />
@@ -134,6 +138,23 @@ export function AppShell({ sections, user, signOut, children }: Props) {
 function NavLink({ item, active }: { item: NavItem; active: boolean }) {
   const { isMobile, setOpenMobile } = useSidebar();
   const Icon = TOOL_ICONS[item.icon];
+  if (!item.href) {
+    return (
+      <SidebarMenuItem>
+        <SidebarMenuButton
+          aria-disabled
+          tooltip={`${item.label} (coming soon)`}
+          className="text-sidebar-foreground/60 cursor-default hover:bg-transparent"
+        >
+          <Icon />
+          <span>{item.label}</span>
+        </SidebarMenuButton>
+        <SidebarMenuBadge className="text-sidebar-foreground/60 text-[10px] font-normal">
+          Soon
+        </SidebarMenuBadge>
+      </SidebarMenuItem>
+    );
+  }
   return (
     <SidebarMenuItem>
       <SidebarMenuButton

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { PERMISSIONS } from "@/platform/permissions/policy";
 
-import { describeAction, describeEntityType } from "./labels";
+import { describeAction, describeEntityType, describeReason } from "./labels";
 
 describe("describeAction", () => {
   it("has a plain-English label for every permission", () => {
@@ -26,5 +26,38 @@ describe("describeEntityType", () => {
   it("splits unknown types into words", () => {
     expect(describeEntityType("ApprovalRequest")).toBe("Approval request");
     expect(describeEntityType("KycCase")).toBe("Kyc Case");
+  });
+});
+
+describe("describeReason", () => {
+  it.each([
+    [
+      "Role SUPPORT lacks permission audit.view",
+      "Support users aren't allowed to view the audit log.",
+    ],
+    [
+      "Not signed in; audit.view requires a session",
+      "Someone who wasn't signed in tried to view the audit log.",
+    ],
+    [
+      "Cannot decide your own request",
+      "People can't approve or reject their own requests.",
+    ],
+    [
+      "Request is COMPLETED, not PENDING",
+      "The request was already completed, so it couldn't be decided.",
+    ],
+    [
+      "Timed out after 300s in processing",
+      "Processing took longer than 5 minutes, so the outcome is unknown.",
+    ],
+  ])("rewrites %j", (reason, expected) => {
+    expect(describeReason(reason)).toBe(expected);
+  });
+
+  it("leaves people's own reasons alone", () => {
+    expect(describeReason("Customer was double charged")).toBe(
+      "Customer was double charged",
+    );
   });
 });

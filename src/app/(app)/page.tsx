@@ -33,7 +33,9 @@ export default async function Home() {
     countApprovals(user, "mine"),
   ]);
   const tools = TOOLS.filter(
-    (tool) => !tool.permission || hasPermission(user.role, tool.permission),
+    (tool) =>
+      tool.kind === "tool" &&
+      (!tool.permission || hasPermission(user.role, tool.permission)),
   );
 
   return (
@@ -97,43 +99,45 @@ export default async function Home() {
         </CardContent>
       </Card>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold tracking-tight">Your tools</h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {tools.map((tool) => {
-            const Icon = TOOL_ICONS[tool.icon];
-            const body = (
-              <Card
-                className={
-                  tool.href
-                    ? "hover:ring-primary/40 h-full transition-shadow hover:ring-2"
-                    : "h-full opacity-70"
-                }
-              >
-                <CardHeader>
-                  <div className="bg-primary/10 text-primary mb-2 flex size-9 items-center justify-center rounded-lg">
-                    <Icon className="size-5" />
-                  </div>
-                  <CardTitle>{tool.name}</CardTitle>
-                  <CardDescription>{tool.description}</CardDescription>
-                  {!tool.href && (
-                    <CardAction>
-                      <Badge variant="secondary">Coming soon</Badge>
-                    </CardAction>
-                  )}
-                </CardHeader>
-              </Card>
-            );
-            return tool.href ? (
-              <Link key={tool.key} href={tool.href} className="rounded-xl">
-                {body}
-              </Link>
-            ) : (
-              <div key={tool.key}>{body}</div>
-            );
-          })}
-        </div>
-      </section>
+      {tools.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <h2 className="text-lg font-semibold tracking-tight">Your tools</h2>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {tools.map((tool) => {
+              const Icon = TOOL_ICONS[tool.icon];
+              const body = (
+                <Card
+                  className={
+                    tool.href
+                      ? "hover:ring-primary/40 h-full transition-shadow hover:ring-2"
+                      : "h-full opacity-70"
+                  }
+                >
+                  <CardHeader>
+                    <div className="bg-primary/10 text-primary mb-2 flex size-9 items-center justify-center rounded-lg">
+                      <Icon className="size-5" />
+                    </div>
+                    <CardTitle>{tool.name}</CardTitle>
+                    <CardDescription>{tool.description}</CardDescription>
+                    {!tool.href && (
+                      <CardAction>
+                        <Badge variant="secondary">Coming soon</Badge>
+                      </CardAction>
+                    )}
+                  </CardHeader>
+                </Card>
+              );
+              return tool.href ? (
+                <Link key={tool.key} href={tool.href} className="rounded-xl">
+                  {body}
+                </Link>
+              ) : (
+                <div key={tool.key}>{body}</div>
+              );
+            })}
+          </div>
+        </section>
+      )}
     </PageBody>
   );
 }

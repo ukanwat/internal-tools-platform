@@ -2,7 +2,7 @@ import { countApprovals } from "@/platform/approvals";
 import { getCurrentUser } from "@/platform/auth";
 import { signOut } from "@/platform/auth/actions";
 import { hasPermission, ROLE_LABELS } from "@/platform/permissions";
-import { TOOLS } from "@/platform/tools";
+import { TOOLS, type ToolDefinition } from "@/platform/tools";
 import { AppShell, type NavItem } from "@/platform/ui/app-shell";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
@@ -11,24 +11,25 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
 
   const waiting = await countApprovals(user, "waiting");
   // Navigation only; each page enforces its own permission.
-  const tools: NavItem[] = TOOLS.filter(
-    (tool) =>
-      tool.href &&
-      (!tool.permission || hasPermission(user.role, tool.permission)),
-  ).map((tool) => ({
-    href: tool.href!,
-    label: tool.name,
-    icon: tool.icon,
-    badge: tool.key === "approvals" ? waiting : undefined,
-  }));
+  const navItems = (kind: ToolDefinition["kind"]): NavItem[] =>
+    TOOLS.filter(
+      (tool) =>
+        tool.kind === kind &&
+        (!tool.permission || hasPermission(user.role, tool.permission)),
+    ).map((tool) => ({
+      href: tool.href,
+      label: tool.name,
+      icon: tool.icon,
+      badge: tool.key === "approvals" ? waiting : undefined,
+    }));
+  const tools = navItems("tool");
 
   return (
     <AppShell
       sections={[
-        {
-          label: "Workspace",
-          items: [{ href: "/", label: "Home", icon: "home" }, ...tools],
-        },
+        { items: [{ href: "/", label: "Home", icon: "home" }] },
+        ...(tools.length > 0 ? [{ label: "Tools", items: tools }] : []),
+        { label: "Oversight", items: navItems("platform") },
       ]}
       user={{
         name: user.name,

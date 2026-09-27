@@ -1,4 +1,5 @@
 import type { Permission } from "@/platform/permissions/policy";
+import { ROLE_LABELS, type Role } from "@/platform/permissions/roles";
 
 /** Plain-English labels for permission checks; denials are logged under the permission. */
 const PERMISSION_ACTIONS: Record<Permission, string> = {
@@ -43,4 +44,68 @@ const ENTITY_TYPES: Record<string, string> = {
 export function describeEntityType(type: string): string {
   if (Object.hasOwn(ENTITY_TYPES, type)) return ENTITY_TYPES[type];
   return type.replace(/([a-z])([A-Z])/g, "$1 $2");
+}
+
+const REQUEST_STATUSES: Record<string, string> = {
+  PENDING: "pending",
+  PROCESSING: "being processed",
+  OUTCOME_UNKNOWN: "waiting for its outcome",
+  COMPLETED: "completed",
+  REJECTED: "rejected",
+};
+
+function lowerFirst(text: string) {
+  return text.charAt(0).toLowerCase() + text.slice(1);
+}
+
+function formatDuration(seconds: number) {
+  if (seconds % 60 === 0) {
+    const minutes = seconds / 60;
+    return `${minutes} ${minutes === 1 ? "minute" : "minutes"}`;
+  }
+  return `${seconds} ${seconds === 1 ? "second" : "seconds"}`;
+}
+
+const REASONS: [RegExp, (...groups: string[]) => string][] = [
+  [
+    /^Role (\w+) lacks permission ([\w.]+)$/,
+    (role, permission) =>
+      `${Object.hasOwn(ROLE_LABELS, role) ? ROLE_LABELS[role as Role] : role} users aren't allowed to ${lowerFirst(describeAction(permission))}.`,
+  ],
+  [
+    /^Not signed in; ([\w.]+) requires a session$/,
+    (permission) =>
+      `Someone who wasn't signed in tried to ${lowerFirst(describeAction(permission))}.`,
+  ],
+  [
+    /^Cannot decide your own request$/,
+    () => "People can't approve or reject their own requests.",
+  ],
+  [
+    /^Request is (\w+), not PENDING$/,
+    (status) =>
+      `The request was already ${REQUEST_STATUSES[status] ?? lowerFirst(status)}, so it couldn't be decided.`,
+  ],
+  [
+    /^Request was decided concurrently$/,
+    () => "Someone else decided this request at the same moment.",
+  ],
+  [
+    /^Unknown approval type (.+)$/,
+    (type) => `No tool handles "${type}" requests any more.`,
+  ],
+  [
+    /^Timed out after (\d+)s in processing$/,
+    (seconds) =>
+      `Processing took longer than ${formatDuration(Number(seconds))}, so the outcome is unknown.`,
+  ],
+];
+
+/** Rewrites the platform's own reason codes in plain English; people's own words pass through. */
+export function describeReason(reason: string): string {
+  for (const [pattern, describe] of REASONS) {
+    const match = pattern.exec(reason);
+    if (match) return describe(...match.slice(1));
+  }
+  return reason;
 }

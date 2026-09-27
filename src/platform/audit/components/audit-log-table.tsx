@@ -7,7 +7,7 @@ import {
 } from "@/platform/ui";
 import { LocalTime } from "@/platform/ui/local-time";
 
-import { describeAction, describeEntityType } from "../labels";
+import { describeAction, describeEntityType, describeReason } from "../labels";
 
 export type AuditLogRow = {
   id: string;
@@ -77,7 +77,11 @@ function columns(
       header: "Why",
       className: "max-w-xs whitespace-normal",
       cell: (entry) =>
-        entry.reason ?? <span className="text-muted-foreground">—</span>,
+        entry.reason ? (
+          <span title={entry.reason}>{describeReason(entry.reason)}</span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
     },
     {
       header: "Details",
