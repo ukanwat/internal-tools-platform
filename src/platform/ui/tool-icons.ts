@@ -1,5 +1,6 @@
 import {
   BadgeCheckIcon,
+  FlagIcon,
   HomeIcon,
   ReceiptTextIcon,
   ScrollTextIcon,
@@ -15,4 +16,5 @@ export const TOOL_ICONS: Record<ToolIcon | "home", LucideIcon> = {
   audit: ScrollTextIcon,
   refunds: ReceiptTextIcon,
   kyc: ShieldCheckIcon,
+  flags: FlagIcon,
 };

@@ -12,6 +12,8 @@ enum Role {
   FINANCE_APPROVER
   COMPLIANCE_REVIEWER
   COMPLIANCE_LEAD
+  ENGINEER
+  ENG_MANAGER
   ADMIN
 }
 
@@ -30,14 +32,15 @@ enum ApprovalStatus {
 }
 
 model User {
-  id           String            @id
-  email        String            @unique
+  id           String             @id
+  email        String             @unique
   name         String
   role         Role
-  createdAt    DateTime          @default(now()) @map("created_at")
+  createdAt    DateTime           @default(now()) @map("created_at")
   auditEntries AuditLog[]
-  requested    ApprovalRequest[] @relation("requestedBy")
-  decided      ApprovalRequest[] @relation("decidedBy")
+  requested    ApprovalRequest[]  @relation("requestedBy")
+  decided      ApprovalRequest[]  @relation("decidedBy")
+  flagChanges  FeatureFlagState[]
   refunds      Refund[]
   attachments  Attachment[]
 
@@ -167,6 +170,52 @@ enum MockPaymentStatus {
   PENDING
   SUCCEEDED
   FAILED
+}
+
+enum FlagEnvironment {
+  STAGING
+  PRODUCTION
+}
+
+model FeatureFlag {
+  id          String             @id @default(cuid())
+  /// Stable key the application code reads, e.g. `checkout-v2`.
+  key         String             @unique
+  description String
+  createdAt   DateTime           @default(now()) @map("created_at")
+  states      FeatureFlagState[]
+
+  @@map("feature_flags")
+}
+
+/// A flag's setting in one environment.
+model FeatureFlagState {
+  id             String                @id @default(cuid())
+  flagId         String                @map("flag_id")
+  flag           FeatureFlag           @relation(fields: [flagId], references: [id], onDelete: Restrict)
+  environment    FlagEnvironment
+  enabled        Boolean               @default(false)
+  /// Share of traffic that sees the flag while it's on, 0–100.
+  rolloutPercent Int                   @default(0) @map("rollout_percent")
+  /// Bumped on every change so stale edits and approvals can't overwrite newer ones.
+  version        Int                   @default(0)
+  updatedById    String?               @map("updated_by_id")
+  updatedBy      User?                 @relation(fields: [updatedById], references: [id], onDelete: Restrict)
+  updatedAt      DateTime              @updatedAt @map("updated_at")
+  appliedChanges FeatureFlagApproval[]
+
+  @@unique([flagId, environment])
+  @@map("feature_flag_states")
+}
+
+/// One row per approval request that has been applied, so a retried execution is a no-op.
+model FeatureFlagApproval {
+  approvalRequestId String           @id @map("approval_request_id")
+  stateId           String           @map("state_id")
+  state             FeatureFlagState @relation(fields: [stateId], references: [id], onDelete: Restrict)
+  appliedAt         DateTime         @default(now()) @map("applied_at")
+
+  @@map("feature_flag_approvals")
 }
 
 /// A file attached to a tool's record. Kept as a record: a database trigger

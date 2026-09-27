@@ -12,6 +12,11 @@ const PERMISSION_ACTIONS: Record<Permission, string> = {
   "audit.view": "View the audit log",
   "pii.reveal_account_number": "Reveal an account number",
   "pii.reveal_id_number": "Reveal an ID number",
+  "flags.view": "View feature flags",
+  "flags.change_staging": "Change a staging feature flag",
+  "flags.reduce_production": "Turn off or scale back a production feature flag",
+  "flags.request_production": "Request a production feature flag change",
+  "flags.approve_production": "Approve a production feature flag change",
 };
 
 const ACTIONS: Record<string, string> = {
@@ -25,6 +30,8 @@ const ACTIONS: Record<string, string> = {
   "approvals.fail": "Request processing failed",
   "approvals.outcome_unknown": "Request outcome unknown",
   "sensitive.reveal": "Revealed sensitive data",
+  "flags.change": "Changed a feature flag",
+  "flags.turn_off": "Turned off a feature flag",
   "refunds.create": "Refund requested",
   "refunds.paid": "Refund paid",
   "refunds.payment_failed": "Refund payment failed",
@@ -44,6 +51,7 @@ export function describeAction(action: string): string {
 const ENTITY_TYPES: Record<string, string> = {
   ApprovalRequest: "Approval request",
   User: "Person",
+  FeatureFlagState: "Feature flag",
 };
 
 export function describeEntityType(type: string): string {
