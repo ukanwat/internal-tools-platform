@@ -7,7 +7,9 @@ import { db } from "@/platform/db";
 /** Truncates platform tables and re-seeds users before each test. */
 export function setupTestDatabase() {
   beforeEach(async () => {
-    await db.$executeRawUnsafe(`TRUNCATE "audit_log", "users" CASCADE`);
+    await db.$executeRawUnsafe(
+      `TRUNCATE "audit_log", "approval_requests", "mock_payments", "users" CASCADE`,
+    );
     await db.user.createMany({ data: [...SEED_USERS] });
   });
   afterAll(async () => {

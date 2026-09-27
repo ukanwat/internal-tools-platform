@@ -17,6 +17,9 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
             Internal Tools
           </Link>
           {/* Navigation only; the audit page enforces audit.view itself. */}
+          <Link href="/approvals" className="text-muted-foreground">
+            Approvals
+          </Link>
           {hasPermission(user.role, "audit.view") && (
             <Link href="/admin/audit" className="text-muted-foreground">
               Audit log

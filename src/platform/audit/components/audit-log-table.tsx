@@ -1,14 +1,10 @@
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import type { AuditOutcome, Role } from "@/generated/prisma/enums";
 import { ROLE_LABELS } from "@/platform/permissions/roles";
+import {
+  AuditOutcomeBadge,
+  DataTable,
+  type DataTableColumn,
+} from "@/platform/ui";
 
 export type AuditLogRow = {
   id: string;
@@ -24,69 +20,63 @@ export type AuditLogRow = {
   reason: string | null;
 };
 
-export function AuditLogTable({ entries }: { entries: AuditLogRow[] }) {
-  if (entries.length === 0) {
-    return (
-      <p className="text-muted-foreground py-8 text-center text-sm">
-        No audit entries match these filters.
-      </p>
-    );
-  }
+const COLUMNS: DataTableColumn<AuditLogRow>[] = [
+  {
+    header: "When (UTC)",
+    className: "font-mono text-xs",
+    cell: (entry) =>
+      entry.createdAt.toISOString().replace("T", " ").slice(0, 19),
+  },
+  {
+    header: "Who",
+    cell: (entry) =>
+      entry.actor ? (
+        <div className="flex flex-col">
+          <span>{entry.actor.name}</span>
+          <span className="text-muted-foreground text-xs">
+            {entry.actorRole ? ROLE_LABELS[entry.actorRole] : null}
+          </span>
+        </div>
+      ) : (
+        <span className="text-muted-foreground">Anonymous</span>
+      ),
+  },
+  {
+    header: "Action",
+    className: "font-mono text-xs",
+    cell: (entry) => entry.action,
+  },
+  {
+    header: "Record",
+    className: "font-mono text-xs",
+    cell: (entry) =>
+      entry.entityType ? `${entry.entityType}:${entry.entityId}` : "—",
+  },
+  {
+    header: "Outcome",
+    cell: (entry) => <AuditOutcomeBadge outcome={entry.outcome} />,
+  },
+  {
+    header: "Why",
+    className: "max-w-xs text-sm whitespace-normal",
+    cell: (entry) => entry.reason ?? "—",
+  },
+  {
+    header: "Change",
+    cell: (entry) => (
+      <ChangeDetails before={entry.before} after={entry.after} />
+    ),
+  },
+];
 
+export function AuditLogTable({ entries }: { entries: AuditLogRow[] }) {
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>When (UTC)</TableHead>
-          <TableHead>Who</TableHead>
-          <TableHead>Action</TableHead>
-          <TableHead>Record</TableHead>
-          <TableHead>Outcome</TableHead>
-          <TableHead>Why</TableHead>
-          <TableHead>Change</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {entries.map((entry) => (
-          <TableRow key={entry.id} className="align-top">
-            <TableCell className="font-mono text-xs">
-              {entry.createdAt.toISOString().replace("T", " ").slice(0, 19)}
-            </TableCell>
-            <TableCell>
-              {entry.actor ? (
-                <div className="flex flex-col">
-                  <span>{entry.actor.name}</span>
-                  <span className="text-muted-foreground text-xs">
-                    {entry.actorRole ? ROLE_LABELS[entry.actorRole] : null}
-                  </span>
-                </div>
-              ) : (
-                <span className="text-muted-foreground">Anonymous</span>
-              )}
-            </TableCell>
-            <TableCell className="font-mono text-xs">{entry.action}</TableCell>
-            <TableCell className="font-mono text-xs">
-              {entry.entityType ? `${entry.entityType}:${entry.entityId}` : "—"}
-            </TableCell>
-            <TableCell>
-              <Badge
-                variant={
-                  entry.outcome === "DENIED" ? "destructive" : "secondary"
-                }
-              >
-                {entry.outcome === "DENIED" ? "Denied" : "Success"}
-              </Badge>
-            </TableCell>
-            <TableCell className="max-w-xs text-sm whitespace-normal">
-              {entry.reason ?? "—"}
-            </TableCell>
-            <TableCell>
-              <ChangeDetails before={entry.before} after={entry.after} />
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+    <DataTable
+      columns={COLUMNS}
+      rows={entries}
+      rowKey={(entry) => entry.id}
+      empty="No audit entries match these filters."
+    />
   );
 }
 
