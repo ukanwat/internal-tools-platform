@@ -307,7 +307,9 @@ export async function approveApprovalRequest(
     );
   }
 
-  const execution = check.type.execute(executionContext(claimed, integrations));
+  const execution = Promise.resolve().then(() =>
+    check.type.execute(executionContext(claimed, integrations)),
+  );
   try {
     await withTimeout(execution, processingTimeoutMs);
   } catch (error) {

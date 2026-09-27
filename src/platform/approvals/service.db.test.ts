@@ -292,6 +292,29 @@ describe("approveApprovalRequest", () => {
     ).toBe(2);
   });
 
+  it("puts a request back to pending when execute throws synchronously", async () => {
+    const request = await newRequest();
+    const throwing: Integrations["payments"] = {
+      ...realPayments,
+      refund: () => {
+        throw new Error("boom");
+      },
+    };
+    const result = await approveApprovalRequest(finance, request.id, "ok", {
+      ...deps,
+      integrations: { payments: throwing },
+    });
+    expect(result).toMatchObject({ ok: false });
+    expect(
+      await db.approvalRequest.findUniqueOrThrow({ where: { id: request.id } }),
+    ).toMatchObject({ status: "PENDING" });
+    expect(
+      await db.auditLog.findFirst({
+        where: { entityId: request.id, action: "approvals.fail" },
+      }),
+    ).toMatchObject({ reason: "boom" });
+  });
+
   it("marks a timed-out request outcome unknown so it can't be decided again", async () => {
     const request = await newRequest(MOCK_PAYMENT_IDS.hang);
     const result = await approveApprovalRequest(finance, request.id, "ok", {

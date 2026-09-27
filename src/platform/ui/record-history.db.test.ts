@@ -33,6 +33,7 @@ async function seedHistory() {
     outcome: "FAILURE",
     entity,
     reason: "Provider error for card 4242",
+    before: { lastError: "Provider error for card 4242" },
   });
 }
 
@@ -40,8 +41,13 @@ const history = (viewer: typeof support) =>
   listRecordHistory({ viewer, entityType: entity.type, entityId: entity.id });
 
 describe("listRecordHistory", () => {
-  it("hides denied entries and failure reasons without audit.view", async () => {
+  it("hides denied entries, failure reasons and snapshots without audit.view", async () => {
     await seedHistory();
+    expect(
+      (await history(support)).every(
+        (e) => e.before === null && e.after === null,
+      ),
+    ).toBe(true);
     expect(
       (await history(support)).map((e) => [e.action, e.outcome, e.reason]),
     ).toEqual([

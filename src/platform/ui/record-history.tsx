@@ -17,7 +17,7 @@ type Props = {
 /**
  * A record's audit trail as `viewer` may see it. Without `audit.view`, denied
  * attempts are left out and failure reasons (which can hold raw integration
- * errors) are hidden.
+ * errors) and before/after snapshots are hidden.
  */
 export async function listRecordHistory({
   viewer,
@@ -36,9 +36,12 @@ export async function listRecordHistory({
   });
   return fullAccess
     ? entries
-    : entries.map((entry) =>
-        entry.outcome === "FAILURE" ? { ...entry, reason: null } : entry,
-      );
+    : entries.map((entry) => ({
+        ...entry,
+        before: null,
+        after: null,
+        reason: entry.outcome === "FAILURE" ? null : entry.reason,
+      }));
 }
 
 /**
