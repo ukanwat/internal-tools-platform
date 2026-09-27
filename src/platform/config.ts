@@ -32,3 +32,8 @@ export function refundApprovalThresholdMinor(): number {
       : DEFAULT_REFUND_APPROVAL_THRESHOLD_USD;
   return Math.round(dollars * 100);
 }
+
+/** Where uploaded attachments are stored on local disk. */
+export function attachmentsStorageDir(): string {
+  return process.env.ATTACHMENTS_STORAGE_DIR || ".data/attachments";
+}

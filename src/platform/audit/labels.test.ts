@@ -40,6 +40,18 @@ describe("describeReason", () => {
       "Someone who wasn't signed in tried to view the audit log.",
     ],
     [
+      "Not signed in; downloads require a session",
+      "Someone who wasn't signed in tried to download a file.",
+    ],
+    [
+      "KycCase policy does not allow viewing this record's files",
+      "This person isn't allowed to see this record's files.",
+    ],
+    [
+      "KycCase policy does not allow uploads on this record",
+      "This person isn't allowed to add files to this record.",
+    ],
+    [
       "Cannot decide your own request",
       "People can't approve or reject their own requests.",
     ],
