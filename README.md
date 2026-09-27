@@ -109,14 +109,27 @@ export const refundApproval = defineApprovalType<RefundPayload>({
   entity: (p) => ({ type: "Payment", id: p.paymentId }),
   execute: ({ payload, idempotencyKey, integrations }) =>
     integrations.payments.refund({ idempotencyKey, ...payload }).then(() => {}),
+  checkOutcome: async ({ idempotencyKey, integrations }) => {
+    const refund = await integrations.payments.findRefund(idempotencyKey);
+    if (!refund || refund.status === "failed") return "failed";
+    return refund.status === "succeeded" ? "completed" : null; // null: still in flight
+  },
 });
 ```
 
 The tool then calls `createApprovalRequest(user, { type, payload, reason })`. On approval the
-request is marked `PROCESSING`, then `execute` runs. If `execute` throws, or runs longer than
-`APPROVAL_PROCESSING_TIMEOUT_MS` (default 5 minutes), the request goes back to `PENDING` with the
-error, and the failure is logged. Requests left in `PROCESSING` past the timeout get the same
-treatment the next time anyone loads `/approvals` or decides a request. Nobody can decide their own
+request is marked `PROCESSING`, then `execute` runs:
+
+- If `execute` throws, the request goes back to `PENDING` and the failure is logged.
+- If `execute` runs longer than `APPROVAL_PROCESSING_TIMEOUT_MS` (default 5 minutes), the request is
+  marked `OUTCOME_UNKNOWN`. Nobody can approve or reject it in that state. Once the late execution
+  finishes, or on the next `settleApprovals` sweep (which runs whenever `/approvals` loads or a
+  request is decided), `checkOutcome` decides where it goes: `COMPLETED` if it went through,
+  `PENDING` if it definitely didn't. While the outcome can still change, `checkOutcome` returns
+  `null` and the request stays `OUTCOME_UNKNOWN`. Requests left in `PROCESSING` past the timeout are treated the same way.
+
+Users only see a generic error message. The raw error goes in the audit log, and record history
+hides it, and denied attempts, from anyone without `audit.view`. Nobody can decide their own
 request. Every block writes a `DENIED` audit entry first, the same way `requirePermission` does.
 `execute` receives the request id as `idempotencyKey`, so a retry never pays twice.
 

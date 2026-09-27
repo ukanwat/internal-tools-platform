@@ -25,6 +25,24 @@ describe("mock payments", () => {
     expect(await db.mockPayment.count()).toBe(1);
   });
 
+  it("finds a refund and its status by idempotency key", async () => {
+    const payments = createMockPaymentsClient();
+    expect(await payments.findRefund("req_1")).toBeNull();
+    const { refundId } = await payments.refund(input);
+    expect(await payments.findRefund("req_1")).toEqual({
+      refundId,
+      status: "succeeded",
+    });
+  });
+
+  it("reports a refund that hasn't finished as pending", async () => {
+    const payments = createMockPaymentsClient();
+    void payments.refund({ ...input, paymentId: MOCK_PAYMENT_IDS.hang });
+    await expect
+      .poll(async () => (await payments.findRefund("req_1"))?.status)
+      .toBe("pending");
+  });
+
   it("returns the original refund to concurrent calls with the same key", async () => {
     const payments = createMockPaymentsClient();
     const results = await Promise.all(
@@ -35,13 +53,19 @@ describe("mock payments", () => {
     expect(await db.mockPayment.count()).toBe(1);
   });
 
-  it("declines the decline test payment without recording it", async () => {
-    await expect(
-      createMockPaymentsClient().refund({
-        ...input,
-        paymentId: MOCK_PAYMENT_IDS.decline,
-      }),
-    ).rejects.toThrow(/declined/);
-    expect(await db.mockPayment.count()).toBe(0);
+  it("records a declined refund as failed and lets it be retried", async () => {
+    const payments = createMockPaymentsClient();
+    const declined = { ...input, paymentId: MOCK_PAYMENT_IDS.decline };
+    await expect(payments.refund(declined)).rejects.toThrow(/declined/);
+    expect(await payments.findRefund("req_1")).toMatchObject({
+      status: "failed",
+    });
+    const retried = await payments.refund(input);
+    expect(retried.replayed).toBe(false);
+    expect(await payments.findRefund("req_1")).toEqual({
+      refundId: retried.refundId,
+      status: "succeeded",
+    });
+    expect(await db.mockPayment.count()).toBe(1);
   });
 });

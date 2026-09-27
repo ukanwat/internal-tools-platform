@@ -24,16 +24,17 @@ enum AuditOutcome {
 enum ApprovalStatus {
   PENDING
   PROCESSING
+  OUTCOME_UNKNOWN
   COMPLETED
   REJECTED
 }
 
 model User {
-  id           String     @id
-  email        String     @unique
+  id           String            @id
+  email        String            @unique
   name         String
   role         Role
-  createdAt    DateTime   @default(now()) @map("created_at")
+  createdAt    DateTime          @default(now()) @map("created_at")
   auditEntries AuditLog[]
   requested    ApprovalRequest[] @relation("requestedBy")
   decided      ApprovalRequest[] @relation("decidedBy")
@@ -96,13 +97,20 @@ model ApprovalRequest {
 
 /// Backing store for the mock payments integration.
 model MockPayment {
-  id             String   @id @default(cuid())
-  idempotencyKey String   @unique @map("idempotency_key")
+  id             String            @id @default(cuid())
+  idempotencyKey String            @unique @map("idempotency_key")
   kind           String
-  paymentId      String   @map("payment_id")
-  amountMinor    Int      @map("amount_minor")
+  paymentId      String            @map("payment_id")
+  amountMinor    Int               @map("amount_minor")
   currency       String
-  createdAt      DateTime @default(now()) @map("created_at")
+  status         MockPaymentStatus @default(PENDING)
+  createdAt      DateTime          @default(now()) @map("created_at")
 
   @@map("mock_payments")
+}
+
+enum MockPaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
 }

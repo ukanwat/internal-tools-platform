@@ -7,7 +7,7 @@ export {
 export {
   approveApprovalRequest,
   createApprovalRequest,
-  failStaleApprovals,
+  settleApprovals,
   rejectApprovalRequest,
   type ApprovalDeps,
   type ApprovalResult,
