@@ -21,9 +21,9 @@ export async function SignInPicker() {
   return (
     <Card className="w-full max-w-md">
       <CardHeader>
-        <CardTitle>Sign in as</CardTitle>
+        <CardTitle>Sign in</CardTitle>
         <CardDescription>
-          Development login. Pick a seeded user to act as.
+          Development login: pick a seeded person to act as.
         </CardDescription>
       </CardHeader>
       <CardContent>

@@ -1,11 +1,21 @@
+import { InboxIcon, TriangleAlertIcon } from "lucide-react";
+
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import type { CurrentUser } from "@/platform/auth/types";
 import { ROLE_LABELS } from "@/platform/permissions/roles";
-import { formatTimestamp } from "@/platform/ui";
+import { LocalTime } from "@/platform/ui/local-time";
 import { RecordHistory } from "@/platform/ui/record-history";
 
 import type { ApprovalListItem } from "../query";
 import { ApprovalStatusBadge } from "./approval-status-badge";
-import { DecisionForm } from "./decision-form";
+import { DecisionButtons } from "./decision-buttons";
 
 export function ApprovalsList({
   requests,
@@ -16,57 +26,83 @@ export function ApprovalsList({
 }) {
   if (requests.length === 0) {
     return (
-      <p className="text-muted-foreground py-8 text-center text-sm">
-        Nothing here.
-      </p>
+      <div className="text-muted-foreground flex flex-col items-center gap-2 rounded-xl border border-dashed py-12 text-center text-sm">
+        <InboxIcon className="size-8" />
+        <p>Nothing here right now.</p>
+      </div>
     );
   }
   return (
     <ul className="flex flex-col gap-4">
       {requests.map((request) => (
-        <li
-          key={request.id}
-          className="grid gap-4 rounded-lg border p-4 md:grid-cols-[1fr_20rem]"
-        >
-          <div className="flex flex-col gap-2 text-sm">
-            <div className="flex flex-wrap items-center gap-2">
-              <ApprovalStatusBadge status={request.status} />
-              <span className="text-muted-foreground text-xs">
-                {request.typeLabel}
-              </span>
-            </div>
-            <p className="font-medium">{request.summary}</p>
-            <p>
-              Requested by {request.requestedBy.name} (
-              {ROLE_LABELS[request.requestedBy.role]}) on{" "}
-              {formatTimestamp(request.createdAt)}
-            </p>
-            <p className="text-muted-foreground whitespace-pre-wrap">
-              Why: {request.requestReason}
-            </p>
-            {request.decidedBy && (
-              <p>
-                Decided by {request.decidedBy.name}
-                {request.decisionReason && `: ${request.decisionReason}`}
-              </p>
-            )}
-            {request.lastError && (
-              <p className="text-destructive">{request.lastError}</p>
-            )}
-            <details>
-              <summary className="cursor-pointer text-xs">History</summary>
-              <div className="mt-2">
-                <RecordHistory
-                  viewer={viewer}
-                  entityType="ApprovalRequest"
-                  entityId={request.id}
-                />
+        <li key={request.id}>
+          <Card>
+            <CardHeader>
+              <div className="flex flex-wrap items-center gap-2">
+                <ApprovalStatusBadge status={request.status} />
+                <span className="text-muted-foreground text-xs">
+                  {request.typeLabel}
+                </span>
               </div>
-            </details>
-          </div>
-          {request.canDecide && <DecisionForm requestId={request.id} />}
+              <CardTitle>{request.summary}</CardTitle>
+              <CardDescription>
+                Requested by {request.requestedBy.name} (
+                {ROLE_LABELS[request.requestedBy.role]}) ·{" "}
+                <LocalTime date={request.createdAt} />
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3 text-sm">
+              <Quote label="Reason">{request.requestReason}</Quote>
+              {request.decidedBy && (
+                <Quote label={`Decided by ${request.decidedBy.name}`}>
+                  {request.decisionReason}
+                </Quote>
+              )}
+              {request.status === "PENDING" && request.lastError && (
+                <p className="text-destructive bg-destructive/10 flex items-start gap-2 rounded-lg p-3">
+                  <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" />
+                  {request.lastError}
+                </p>
+              )}
+              <details className="group">
+                <summary className="text-primary cursor-pointer text-sm font-medium">
+                  History
+                </summary>
+                <div className="mt-3">
+                  <RecordHistory
+                    viewer={viewer}
+                    entityType="ApprovalRequest"
+                    entityId={request.id}
+                  />
+                </div>
+              </details>
+            </CardContent>
+            {request.canDecide && (
+              <CardFooter className="justify-end">
+                <DecisionButtons
+                  requestId={request.id}
+                  summary={request.summary}
+                />
+              </CardFooter>
+            )}
+          </Card>
         </li>
       ))}
     </ul>
+  );
+}
+
+function Quote({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-muted-foreground text-xs font-medium">{label}</span>
+      {children && <p className="whitespace-pre-wrap">{children}</p>}
+    </div>
   );
 }

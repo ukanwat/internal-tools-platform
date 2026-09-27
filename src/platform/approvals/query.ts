@@ -44,6 +44,14 @@ function tabWhere(
   }
 }
 
+export function countApprovals(
+  user: CurrentUser,
+  tab: ApprovalTab,
+  registry: ApprovalRegistry = approvalRegistry,
+) {
+  return db.approvalRequest.count({ where: tabWhere(user, tab, registry) });
+}
+
 /** Only requests the user made or can decide; nothing else is ever returned. */
 export async function listApprovals(
   user: CurrentUser,
