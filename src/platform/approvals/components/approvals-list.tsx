@@ -58,7 +58,7 @@ export function ApprovalsList({
                   {request.decisionReason}
                 </Quote>
               )}
-              {request.lastError && (
+              {request.status === "PENDING" && request.lastError && (
                 <p className="text-destructive bg-destructive/10 flex items-start gap-2 rounded-lg p-3">
                   <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" />
                   {request.lastError}

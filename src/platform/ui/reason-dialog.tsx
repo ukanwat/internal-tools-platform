@@ -54,12 +54,14 @@ export function ReasonDialog({
 }: Props) {
   const id = useId();
   const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
   const [state, formAction, pending] = useActionState(
     async (prev: ActionResult, formData: FormData) => {
       const result = await action(prev, formData);
       if (result?.ok) {
         toast.success(result.message);
         setOpen(false);
+        setReason("");
       } else if (result) {
         toast.error(result.message);
       }
@@ -92,6 +94,8 @@ export function ReasonDialog({
               placeholder={reasonPlaceholder}
               required
               rows={3}
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
               autoFocus
               error={state && !state.ok ? state.message : undefined}
             />
