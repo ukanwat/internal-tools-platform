@@ -42,21 +42,26 @@ platform lacks, add it to the platform, not the tool.
    (`src/platform/sensitive/components`). Revealing needs a permission and a reason,
    and it's audited. Audit snapshots mask these fields automatically, provided the
    property name matches.
-8. **Files go through the platform attachments module.** It doesn't exist yet. Don't
-   store or serve files from a tool. Ask for `src/platform/attachments` to be built
-   first.
+8. **Files go through the platform attachments module.** Don't store or serve
+   files from a tool. Register an `AttachmentPolicy` for the record type in
+   `attachmentPolicies` (`src/platform/attachments/policies.ts`) with the view and
+   upload permissions plus `canView` / `canUpload` for the record, and render
+   `<Attachments viewer entity />` (`src/platform/ui/attachments.tsx`). The platform
+   checks both, logs every upload and download, and never deletes a file.
 9. **Fake data only.** Seeds, fixtures and mocks use made-up people, accounts and
    IDs. Never paste real customer data anywhere in the repo.
 
 ## Building a tool
 
 ### 1. Write the tool's rules first
+
 Before writing code, list the tool's rules in the PR description: who can view,
 who can request, who decides, what needs approval, which fields are sensitive,
 which limits come from config, and which outside systems it calls. Each rule
 becomes a test (step 8).
 
 ### 2. Where the code goes
+
 ```
 src/app/(app)/<tool>/page.tsx        # route: server component, calls requirePermission
 src/tools/<tool>/actions.ts          # "use server" actions
@@ -65,9 +70,11 @@ src/tools/<tool>/approval-type.ts    # defineApprovalType(...) if the tool needs
 src/tools/<tool>/components/         # tool-only UI built from src/platform/ui
 prisma/schema.prisma                 # tool models; `npx prisma migrate dev --name <tool>_...`
 ```
+
 Tools may import from `src/platform`. The platform must never import from a tool.
 
 ### 3. Permissions
+
 Add permissions to `PERMISSIONS` and grant them in `ROLE_PERMISSIONS`
 (`src/platform/permissions/policy.ts`), which is the only role map. Use `<tool>.<verb>`
 names. Give each one a plain-English label in `src/platform/audit/labels.ts`
@@ -75,12 +82,14 @@ names. Give each one a plain-English label in `src/platform/audit/labels.ts`
 there.
 
 ### 4. Server actions
+
 Follow `src/platform/approvals/actions.ts`: validate `FormData`, call
 `requirePermission(permission, entity)`, call the service, `revalidatePath`, and
 return an `ActionResult` (`{ ok, message }`) with a generic user-facing message.
 Raw errors go to the audit log only.
 
 ### 5. Approvals
+
 Define the type the way `test/approvals.ts` does: `parse` (validate untrusted input),
 `describe`, `entity`, and `execute`, which calls integrations with the
 `idempotencyKey`. Also define `checkOutcome` to look up the result after a timeout.
@@ -89,12 +98,14 @@ created with `createApprovalRequest`, and decisions appear on `/approvals`
 automatically.
 
 ### 6. Sidebar and home page
+
 Add or update the entry in `TOOLS` (`src/platform/tools.ts`) with `kind: "tool"`, an
 `href`, and its view `permission`. Pick an icon in `src/platform/ui/tool-icons.ts`.
 The sidebar Tools section and the home page read from this list. It only controls
 what's shown; the page still calls `requirePermission`.
 
 ### 7. Shared UI (`src/platform/ui`)
+
 - Page: `PageBody` + `PageHeader`
 - Lists: `DataTable`, `FilterBar` (URL-driven), `Pagination`, `LinkTabs`
 - Status: `StatusBadge` (tones, not ad-hoc colours; the accent is `primary`)
@@ -108,8 +119,10 @@ Add missing primitives with `npx shadcn@latest add <component>` into
 `src/components/ui`. Wrap them in `src/platform/ui` if tools will share them.
 
 ### 8. A test for every rule
+
 Every rule from step 1 gets a test. DB-backed tests are named `*.db.test.ts` and use
 `setupTestDatabase()` and `seedUser(role)` from `test/db.ts`. Patterns to copy:
+
 - Blocked and logged, for each role without the permission: `src/platform/permissions/denials.db.test.ts`
 - Approvals: self-approval blocked, failure returns to pending, timeout handling: `src/platform/approvals/service.db.test.ts`
 - Masking and audited reveals: `src/platform/sensitive/service.db.test.ts`

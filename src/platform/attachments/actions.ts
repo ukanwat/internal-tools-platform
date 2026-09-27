@@ -1,17 +1,16 @@
 "use server";
 
 import { requirePermission } from "@/platform/permissions/guard";
+import type { ActionResult } from "@/platform/ui/reason-dialog";
 
 import { formatFileSize } from "./files";
 import { attachmentPolicies, maxBytesFor } from "./policies";
 import { uploadAttachment as upload } from "./service";
 
-export type UploadState = { ok: boolean; message: string } | null;
-
 export async function uploadAttachment(
-  _prev: UploadState,
+  _prev: ActionResult,
   formData: FormData,
-): Promise<UploadState> {
+): Promise<ActionResult> {
   const entityType = formData.get("entityType");
   const entityId = formData.get("entityId");
   const file = formData.get("file");

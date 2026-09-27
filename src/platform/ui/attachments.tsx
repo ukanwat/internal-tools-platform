@@ -7,7 +7,7 @@ import type { CurrentUser } from "@/platform/auth/types";
 
 import { AttachmentUploadForm } from "./attachment-upload-form";
 import { DataTable } from "./data-table";
-import { formatTimestamp } from "./format";
+import { LocalTime } from "./local-time";
 
 type Props = { viewer: CurrentUser; entity: AttachmentEntity };
 
@@ -42,7 +42,7 @@ export async function Attachments({ viewer, entity }: Props) {
             { header: "Uploaded by", cell: (file) => file.uploadedBy },
             {
               header: "Uploaded",
-              cell: (file) => formatTimestamp(file.createdAt),
+              cell: (file) => <LocalTime date={file.createdAt} />,
               className: "text-muted-foreground text-xs",
             },
           ]}

@@ -12,6 +12,9 @@ import {
 } from "@/platform/attachments/files";
 import type { AttachmentEntity } from "@/platform/attachments/types";
 
+import type { ActionResult } from "./reason-dialog";
+import { toast } from "./toast";
+
 type Props = {
   entity: AttachmentEntity;
   allowedTypes: readonly AttachmentContentType[];
@@ -23,7 +26,15 @@ export function AttachmentUploadForm({
   allowedTypes,
   maxBytes,
 }: Props) {
-  const [state, action, pending] = useActionState(uploadAttachment, null);
+  const [state, action, pending] = useActionState(
+    async (prev: ActionResult, formData: FormData) => {
+      const result = await uploadAttachment(prev, formData);
+      if (result?.ok) toast.success(result.message);
+      else if (result) toast.error(result.message);
+      return result;
+    },
+    null,
+  );
   const form = useRef<HTMLFormElement>(null);
   const router = useRouter();
 
@@ -61,13 +72,8 @@ export function AttachmentUploadForm({
         {labels}, up to {formatFileSize(maxBytes)}. Uploaded files are kept
         permanently.
       </p>
-      {state && (
-        <p
-          role="status"
-          className={
-            state.ok ? "text-sm text-emerald-700" : "text-destructive text-sm"
-          }
-        >
+      {state && !state.ok && (
+        <p role="alert" className="text-destructive text-sm">
           {state.message}
         </p>
       )}
